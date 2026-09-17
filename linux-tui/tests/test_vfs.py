@@ -11,7 +11,7 @@ import time
 import unittest
 
 # Ensure 'src' is on sys.path for direct test execution
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
 
 from cybershell.engine.node import (  # noqa: E402
     DirectoryNode,
@@ -256,7 +256,7 @@ class TestVirtualFileSystem(unittest.TestCase):
         self.vfs.reset_from_dict(sector_data, default_cwd="/home/operative")
         elapsed_ms = (time.perf_counter() - t0) * 1000
 
-        # Verify load time is sub-millisecond or negligible (< 10ms even on slow CI)
+        # Verify load time is sub-millisecond or negligible (< 50ms)
         self.assertLess(elapsed_ms, 50.0)
 
         # Verify layout
