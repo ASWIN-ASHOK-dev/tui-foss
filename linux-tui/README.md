@@ -44,22 +44,29 @@ CyberShell v2.0 is developed using the **Strict File Boundary Rule**: each devel
 - **Python 3.8+** (Linux, macOS, or Windows)
 - Zero required third-party runtime dependencies! CyberShell runs completely on Python standard library.
 
-### Option 1: Run via Main Launcher
+### Option 1: Run via `uv` (Recommended)
+[`uv`](https://github.com/astral-sh/uv) is an extremely fast Python package manager written in Rust. It makes running, testing, and publishing the game much easier.
 ```bash
 # Clone the repository
 git clone https://github.com/Amy-code658/tui-foss.git
 cd tui-foss/linux-tui
 
-# Launch the game
-python3 run.py
+# Run the game directly (uv will handle the virtual environment and dependencies automatically!)
+uv run cybershell
 
 # Optional launcher flags
-python3 run.py --name Cipher --sector 0   # Custom operative name & sector
-python3 run.py --demo                    # View UI screen showcase
-python3 run.py --smoke-test              # Run architectural health check
+uv run cybershell --name Cipher --sector 0
+uv run cybershell --demo
+uv run cybershell --smoke-test
 ```
 
-### Option 2: Run Standalone Single-File Bundle
+### Option 2: Run via Main Launcher (Standard Python)
+```bash
+# Launch the game manually
+python3 run.py
+```
+
+### Option 3: Run Standalone Single-File Bundle
 ```bash
 # Zero-dependency, single-file distribution
 python3 cybershell_standalone.py
@@ -95,19 +102,33 @@ In the Mission Lab terminal, execute authentic Linux commands against the virtua
 
 ## 🧪 Testing & Verification
 
-Run the entire automated test suite using Python's standard library test runner:
+Run the entire automated test suite using `uv` (Recommended):
+```bash
+uv run pytest tests/
+```
+
+Or using standard Python:
 ```bash
 python3 -m unittest discover -s tests
 ```
 
-Or using `pytest`:
-```bash
-pytest tests/
-```
-
 To run only the Master Integration Smoke Test:
 ```bash
-python3 -m unittest tests/test_integration.py
+uv run python3 -m unittest tests/test_integration.py
+```
+
+---
+
+## 📦 Publishing
+
+With `uv`, building and publishing CyberShell to PyPI is incredibly simple and fast:
+
+```bash
+# Build source distributions and wheels
+uv build
+
+# Publish to PyPI
+uv publish
 ```
 
 ---
