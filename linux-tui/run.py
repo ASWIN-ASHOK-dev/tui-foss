@@ -333,7 +333,12 @@ def interactive_game_loop(character_name: str, start_sector: int) -> None:
         if user_input == "2" or user_input == "codex":
             app.set_screen(RPGApp.SCREEN_CODEX)
             print(app.render())
-            input("\nPress Enter to return to Mission Lab...")
+            term = input(
+                "\nEnter a command name to decrypt (blank returns to Mission Lab): "
+            ).strip()
+            if term:
+                print(app.codex.display_command(term))
+                input("\nPress Enter to return to Mission Lab...")
             app.set_screen(RPGApp.SCREEN_LAB)
             continue
         if user_input == "3" or user_input == "inventory":
@@ -344,14 +349,46 @@ def interactive_game_loop(character_name: str, start_sector: int) -> None:
             continue
         if user_input == "4" or user_input == "map":
             app.set_screen(RPGApp.SCREEN_MAP)
+            app.mainframe.apply_progression(player)
             print(app.render())
             input("\nPress Enter to return to Mission Lab...")
             app.set_screen(RPGApp.SCREEN_LAB)
             continue
         if user_input == "5" or user_input == "minigame":
+            app.minigame.set_player(player)
             app.set_screen(RPGApp.SCREEN_MINIGAME)
-            print(app.render())
-            input("\nPress Enter to return to Mission Lab...")
+            breach_session = True
+            while breach_session:
+                puzzle = app.minigame.generate_puzzle()
+                app.xp = player.xp
+                print(app.render())
+                while True:
+                    try:
+                        guess = input(
+                            f"Enter the octal code for pattern '{puzzle.permission}' "
+                            "(or 'q' to return): "
+                        ).strip()
+                    except (KeyboardInterrupt, EOFError):
+                        guess = "q"
+                    if not guess:
+                        continue
+                    if guess.lower() in ("q", "quit", "back", "exit"):
+                        breach_session = False
+                        break
+                    result = app.minigame.validate_answer(guess)
+                    if result.correct:
+                        print(result.message)
+                        if result.xp_awarded > 0:
+                            ticker_msg = (
+                                f"🔓 DOOR #{puzzle.door_number:02d} BREACHED: "
+                                f"+{result.xp_awarded} XP"
+                            )
+                            print(f"+{result.xp_awarded} XP granted!")
+                        else:
+                            ticker_msg = f"🔓 DOOR #{puzzle.door_number:02d} already breached."
+                        break
+                    print(result.message)
+            app.xp = player.xp
             app.set_screen(RPGApp.SCREEN_LAB)
             continue
 

@@ -6,7 +6,10 @@ combat log ticker, and boss HUD elements.
 Authors:
 - Poornendhu: Cyber-TUI Lead & Frame Renderer (layout core, screen transitions)
 - Gautham: Visual FX, ASCII Art & Terminal Box Specialist (terminal buffer, combat ticker, boss HUD)
+- Akash: Hacker Codex & Security Minigame Specialist (screen views)
 """
+
+from __future__ import annotations
 
 import sys
 from typing import List, Optional
@@ -17,6 +20,10 @@ if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     except Exception:
         pass
+
+from cybershell.tools.chmod_minigame import ChmodMinigame
+from cybershell.tools.codex import Codex
+from cybershell.tools.map import MainframeMap, default_mainframe_map
 
 from .ascii_art import (
     CYBER_LOGO,
@@ -29,6 +36,7 @@ from .ascii_art import (
 )
 from .renderer import (
     draw_double_header,
+    draw_panel,
     draw_split_panels,
     terminal_size,
 )
@@ -148,14 +156,14 @@ class CombatTicker:
 
 
 # =============================================================================
-# RPGApp Screen Controller (Poornendhu & Gautham)
+# RPGApp Screen Controller (Poornendhu, Gautham & Akash)
 # =============================================================================
 
 class RPGApp:
     """Main UI controller for CyberShell.
 
     Implements UIProtocol (Amy) with double-pane layout (Poornendhu),
-    terminal widgets, combat ticker, and boss HUD (Gautham).
+    terminal widgets, combat ticker, boss HUD (Gautham), and tactical tools (Akash).
     """
 
     SCREEN_TITLE = 0
@@ -196,6 +204,11 @@ class RPGApp:
         self.boss_hp: int = 100
         self.boss_max_hp: int = 100
         self.is_boss_active: bool = False
+
+        # Integrated tactical tools (Akash: Codex / Map / Chmod Minigame)
+        self.codex = Codex()
+        self.mainframe: MainframeMap = default_mainframe_map()
+        self.minigame = ChmodMinigame(difficulty="easy")
 
     def set_screen(self, screen: int) -> None:
         """Change the active screen view."""
@@ -347,6 +360,53 @@ class RPGApp:
         """Render defeat/game over screen."""
         return get_defeat_banner(styled=False).center(width)
 
+    def render_codex(self, width: int) -> str:
+        """Render the Hacker Codex screen listing all known commands."""
+        header = draw_double_header(
+            self.character_name,
+            self.hp,
+            self.max_hp,
+            self.xp,
+            "HACKER CODEX",
+            width,
+        )
+
+        content = ["[ SPELLBOOK // TACTICAL COMMAND ARCHIVE ]", ""]
+        for entry in self.codex.list_commands():
+            content.append(f"  {entry['name']:<9} {entry['description']}")
+        content.append("")
+        content.append("Type a command name such as 'chmod' to decrypt its entry.")
+
+        panel_lines = draw_panel("HACKER CODEX", content, width - 4)
+        return header + "\n" + "\n".join(panel_lines)
+
+    def render_map(self, width: int) -> str:
+        """Render the Tactical Mainframe Map screen."""
+        header = draw_double_header(
+            self.character_name,
+            self.hp,
+            self.max_hp,
+            self.xp,
+            "TACTICAL MAINFRAME MAP",
+            width,
+        )
+        return header + "\n" + self.mainframe.render()
+
+    def render_minigame(self, width: int) -> str:
+        """Render the Chmod Security Minigame door."""
+        header = draw_double_header(
+            self.character_name,
+            self.hp,
+            self.max_hp,
+            self.xp,
+            "CHMOD SECURITY MINIGAME",
+            width,
+        )
+        if self.minigame.active_puzzle is None:
+            self.minigame.generate_puzzle()
+        door = self.minigame.render_door()
+        return header + "\n" + door
+
     def render(self) -> str:
         """Render the currently active screen."""
         width, _ = terminal_size()
@@ -358,16 +418,16 @@ class RPGApp:
             return self.render_lab(width)
 
         if self.current_screen == self.SCREEN_CODEX:
-            return self.render_simple_screen("CODEX", width)
+            return self.render_codex(width)
 
         if self.current_screen == self.SCREEN_INVENTORY:
             return self.render_simple_screen("INVENTORY", width)
 
         if self.current_screen == self.SCREEN_MAP:
-            return self.render_simple_screen("MAP", width)
+            return self.render_map(width)
 
         if self.current_screen == self.SCREEN_MINIGAME:
-            return self.render_simple_screen("MINIGAME", width)
+            return self.render_minigame(width)
 
         return ""
 
