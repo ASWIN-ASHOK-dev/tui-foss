@@ -27,7 +27,7 @@ CyberShell v2.0 is developed using the **Strict File Boundary Rule**: each devel
 
 | Developer | Core Role | Assigned Files |
 | :--- | :--- | :--- |
-| **Amy** 👑 | **Project Lead & Master Integrator** | `contracts.py`, `pyproject.toml`, `requirements.txt`, `run.py`, `cybershell_standalone.py`, `tests/test_integration.py`, `tests/conftest.py`, `README.md` |
+| **Amy** 🔗 | **Project Lead & Master Integrator** | `contracts.py`, `pyproject.toml`, `requirements.txt`, `run.py`, `cybershell_standalone.py`, `tests/test_integration.py`, `tests/conftest.py`, `README.md` |
 | **Rudra** 💻 | **VFS Architect** | `src/cybershell/engine/node.py`, `src/cybershell/engine/vfs.py`, `tests/test_vfs.py` |
 | **Aniket** ⚡ | **Shell Pipeline & Combat Engine** | `src/cybershell/engine/commands.py`, `src/cybershell/engine/interpreter.py`, `tests/test_interpreter.py` |
 | **Poornendhu** 🖥️ | **Cyber-TUI Lead & Frame Renderer** | `src/cybershell/ui/renderer.py`, `src/cybershell/ui/rpg_app.py`, `tests/test_ui.py` |
