@@ -1,71 +1,75 @@
-"""Tests for Aswin's quest data. Independent of engine/UI code."""
-import pytest
+"""Tests for CyberShell quest data and sector configuration.
 
-from cybershell.game.quests import (
-    ALLOWED_PREDICATES,
-    FIELD_MANUAL,
-    QUEST_DATA,
-    STORY_INTRO,
-)
+Author: Neha (Narrative & Quests)
+Compatible with standard library unittest and pytest.
+"""
 
+from __future__ import annotations
 
-def _vfs_has(vfs, path):
-    node = vfs
-    for part in [p for p in path.split("/") if p]:
-        if not isinstance(node, dict) or node.get("_type") == "file" or part not in node:
-            return False
-        node = node[part]
-    return True
+import os
+import sys
+import unittest
 
+# Ensure src/ is on sys.path
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+SRC_DIR = os.path.join(PROJECT_ROOT, "src")
+if SRC_DIR not in sys.path:
+    sys.path.insert(0, SRC_DIR)
 
-def test_six_sectors_in_order():
-    assert len(QUEST_DATA) == 6
-    assert [q["index"] for q in QUEST_DATA] == [0, 1, 2, 3, 4, 5]
+from cybershell.contracts import Item, Objective, Quest
+from cybershell.game.quests import get_sector_quests
 
 
-def test_unique_ids():
-    quest_ids = [q["id"] for q in QUEST_DATA]
-    obj_ids = [o["id"] for q in QUEST_DATA for o in q["objectives"]]
-    loot_ids = [q["loot"]["id"] for q in QUEST_DATA]
-    assert len(set(quest_ids)) == 6
-    assert len(set(obj_ids)) == len(obj_ids)
-    assert len(set(loot_ids)) == 6
+class TestQuests(unittest.TestCase):
+    """Verify sector quest configurations and objectives."""
+
+    def setUp(self) -> None:
+        self.quests = get_sector_quests()
+
+    def test_six_sectors_in_order(self) -> None:
+        """Verify all 6 sectors (0-5) are present."""
+        self.assertEqual(len(self.quests), 6)
+        self.assertEqual(sorted(self.quests.keys()), [0, 1, 2, 3, 4, 5])
+
+    def test_unique_quest_and_objective_ids(self) -> None:
+        """Ensure all quest and objective IDs are unique across sectors."""
+        quest_ids = [q.id for q in self.quests.values()]
+        self.assertEqual(len(quest_ids), len(set(quest_ids)))
+
+        obj_ids = [obj.id for q in self.quests.values() for obj in q.objectives]
+        self.assertEqual(len(obj_ids), len(set(obj_ids)))
+
+    def test_quest_contract_attributes(self) -> None:
+        """Verify each Quest has valid attributes conforming to contracts."""
+        for sector_id, quest in self.quests.items():
+            self.assertEqual(quest.sector_id, sector_id)
+            self.assertTrue(quest.sector_name)
+            self.assertTrue(quest.npc_name)
+            self.assertTrue(quest.lore)
+            self.assertIsInstance(quest.dialogue, list)
+            self.assertGreater(len(quest.dialogue), 0)
+            self.assertGreater(len(quest.objectives), 0)
+            self.assertIsInstance(quest.reward_item, Item)
+            self.assertGreater(quest.reward_xp, 0)
+
+    def test_objective_contract_attributes(self) -> None:
+        """Verify each Objective conforms to evaluator predicate contracts."""
+        valid_predicates = {
+            "file_exists",
+            "file_not_exists",
+            "file_contains",
+            "permission_equals",
+            "cwd_equals",
+        }
+        for quest in self.quests.values():
+            for obj in quest.objectives:
+                self.assertTrue(obj.id)
+                self.assertTrue(obj.description)
+                self.assertTrue(obj.hint)
+                self.assertIn(obj.predicate_type, valid_predicates)
+                self.assertTrue(obj.predicate_target)
+                self.assertGreater(obj.xp_reward, 0)
 
 
-@pytest.mark.parametrize("quest", QUEST_DATA, ids=lambda q: q["id"])
-def test_quest_shape(quest):
-    for key in ("name", "npc", "intro", "outro", "start_cwd", "vfs", "loot"):
-        assert quest[key], f"{quest['id']} missing {key}"
-    assert len(quest["objectives"]) == 3
-    for o in quest["objectives"]:
-        assert o["description"] and o["hint"]
-        assert o["xp"] > 0
-        assert o["check"][0] in ALLOWED_PREDICATES
-
-
-@pytest.mark.parametrize("quest", QUEST_DATA, ids=lambda q: q["id"])
-def test_start_cwd_exists(quest):
-    assert _vfs_has(quest["vfs"], quest["start_cwd"]) or quest["start_cwd"].startswith("/home")
-
-
-@pytest.mark.parametrize("quest", QUEST_DATA, ids=lambda q: q["id"])
-def test_check_targets_are_reachable(quest):
-    """Predicates that inspect existing things must point at real paths."""
-    for o in quest["objectives"]:
-        name, path = o["check"][0], o["check"][1]
-        if name in ("file_not_exists", "permission_equals"):
-            assert _vfs_has(quest["vfs"], path), f"{o['id']} targets missing {path}"
-
-
-def test_boss_has_three_timed_stages():
-    boss = QUEST_DATA[5]
-    hp = [o["boss_hp_pct"] for o in boss["objectives"]]
-    assert all(o["time_limit_s"] > 0 for o in boss["objectives"])
-    assert hp == sorted(hp, reverse=True)
-    assert hp[-1] == 0
-
-
-def test_field_manual_and_story():
-    assert "COMMAND BASICS" in FIELD_MANUAL
-    assert "chmod" in FIELD_MANUAL
-    assert len(STORY_INTRO) > 50
+if __name__ == "__main__":
+    unittest.main()

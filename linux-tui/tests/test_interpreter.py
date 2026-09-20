@@ -4,7 +4,13 @@ import os
 import sys
 import unittest
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
+# Ensure 'src' and project root are on sys.path for direct test execution
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+SRC_DIR = os.path.join(PROJECT_ROOT, "src")
+if SRC_DIR not in sys.path:
+    sys.path.insert(0, SRC_DIR)
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
 from cybershell.contracts import DEFAULT_BACKLASH_DAMAGE, EngineProtocol  # noqa: E402
 from cybershell.engine.interpreter import ShellInterpreter  # noqa: E402

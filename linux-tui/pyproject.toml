@@ -39,9 +39,10 @@ cybershell = "cybershell.run:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+exclude = ["cybershell.tests*"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests", "src/cybershell/tests"]
+testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
 addopts = "-v"

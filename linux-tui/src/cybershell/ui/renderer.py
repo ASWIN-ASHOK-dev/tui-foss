@@ -4,9 +4,11 @@ CyberShell TUI renderer.
 Provides terminal-safe utilities and fixed-frame rendering helpers.
 """
 
+from __future__ import annotations
+
 import re
 import shutil
-from typing import Iterable
+from typing import Iterable, List, Tuple
 
 ANSI_ESCAPE_RE = re.compile(r"\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 
@@ -73,7 +75,7 @@ def truncate_styled(text: str, max_width: int, suffix: str = "…") -> str:
     return "".join(result) + suffix
 
 
-def terminal_size(default_width: int = 80, default_height: int = 24) -> tuple[int, int]:
+def terminal_size(default_width: int = 80, default_height: int = 24) -> Tuple[int, int]:
     """Return the current terminal size with safe fallbacks."""
     size = shutil.get_terminal_size((default_width, default_height))
     return size.columns, size.lines
@@ -153,7 +155,7 @@ def draw_double_header(
     )
 
 
-def draw_panel(title: str, content: Iterable[str], width: int) -> list[str]:
+def draw_panel(title: str, content: Iterable[str], width: int) -> List[str]:
     """Render one rounded-border panel."""
     width = max(8, width)
     inner_width = width - 2
