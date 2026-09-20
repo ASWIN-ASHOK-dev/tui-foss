@@ -49,7 +49,7 @@ CyberShell v2.0 is developed using the **Strict File Boundary Rule**: each devel
 ```bash
 # Clone the repository
 git clone https://github.com/Amy-code658/tui-foss.git
-cd tui-foss/linux-tui
+cd tui-foss
 
 # Run the game directly (uv handles everything automatically!)
 uv run cybershell

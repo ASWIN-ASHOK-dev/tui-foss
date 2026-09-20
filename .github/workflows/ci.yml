@@ -26,14 +26,13 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          if [ -f linux-tui/requirements.txt ]; then pip install -r linux-tui/requirements.txt; fi
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
       - name: Lint with Ruff
         run: |
-          ruff check linux-tui/src linux-tui/tests
+          ruff check src tests
 
       - name: Run Test Suite
-        working-directory: ./linux-tui
         env:
           PYTHONPATH: src
         run: |
