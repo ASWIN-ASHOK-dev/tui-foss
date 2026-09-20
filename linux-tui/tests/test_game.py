@@ -4,12 +4,21 @@ Author: Aswin (Game State, Progression & Evaluator)
 """
 
 import os
+import sys
 import unittest
 
-from cybershell.contracts import Item
-from cybershell.game.state import SaveManager
-from cybershell.game.evaluator import QuestEvaluator
-from tests.conftest import MockGameState
+# Ensure 'src' and project root are on sys.path for direct test execution
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+SRC_DIR = os.path.join(PROJECT_ROOT, "src")
+if SRC_DIR not in sys.path:
+    sys.path.insert(0, SRC_DIR)
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
+from cybershell.contracts import Item  # noqa: E402
+from cybershell.game.state import SaveManager  # noqa: E402
+from cybershell.game.evaluator import QuestEvaluator  # noqa: E402
+from tests.conftest import MockGameState  # noqa: E402
 
 class MockNode:
     def __init__(self, mode_octal="755"):

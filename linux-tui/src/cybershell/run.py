@@ -12,11 +12,17 @@ import argparse
 import os
 import sys
 
-# Ensure src/ is on sys.path
+# Ensure src/ and project root are on sys.path
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-SRC_DIR = os.path.join(SCRIPT_DIR, "src")
+if os.path.basename(SCRIPT_DIR) == "cybershell":
+    SRC_DIR = os.path.dirname(SCRIPT_DIR)
+else:
+    SRC_DIR = os.path.join(SCRIPT_DIR, "src")
+PROJECT_ROOT = os.path.dirname(SRC_DIR)
 if SRC_DIR not in sys.path:
     sys.path.insert(0, SRC_DIR)
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
 from cybershell import __version__
 from cybershell.contracts import (
@@ -73,7 +79,10 @@ def parse_args() -> argparse.Namespace:
 def run_smoke_test() -> int:
     """Execute Amy's integration test suite as a diagnostic pre-flight check."""
     import unittest
-    suite = unittest.defaultTestLoader.discover("tests", pattern="test_integration.py")
+    tests_dir = os.path.join(PROJECT_ROOT, "tests")
+    if not os.path.isdir(tests_dir):
+        tests_dir = "tests"
+    suite = unittest.defaultTestLoader.discover(tests_dir, pattern="test_integration.py")
     runner = unittest.TextTestRunner(verbosity=2)
     result = runner.run(suite)
     return 0 if result.wasSuccessful() else 1
@@ -308,7 +317,16 @@ def interactive_game_loop(character_name: str, start_sector: int) -> None:
             ticker_msg = f"🎯 {len(newly_completed)} OBJECTIVE(S) ACCOMPLISHED!"
             if is_completed:
                 ticker_msg += " | QUEST COMPLETE!"
-            if quest.is_completed and quest.reward_item:
+                if quest.reward_item:
+                    ticker_msg += f" 🎁 LOOT ACQUIRED: {quest.reward_item.name}!"
+                next_sector = player.current_sector + 1
+                if next_sector in all_quests:
+                    player.current_sector = next_sector
+                    quest = all_quests[next_sector]
+                    ticker_msg += f" 🚀 ADVANCING TO SECTOR {next_sector}: {quest.sector_name}!"
+                else:
+                    ticker_msg += " 🏆 ALL SECTORS LIBERATED! MAINFRAME SECURED!"
+            elif quest.is_completed and quest.reward_item:
                 ticker_msg += f" 🎁 LOOT ACQUIRED: {quest.reward_item.name}!"
         
         if player.level > old_level:

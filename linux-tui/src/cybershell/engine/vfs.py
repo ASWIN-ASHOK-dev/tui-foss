@@ -44,17 +44,26 @@ class VirtualFileSystem:
         self.cd(self.home_dir)
 
     def _init_standard_layout(self) -> None:
-        """Create basic Linux directories: /bin, /etc, /home/operative, /tmp, /var/log."""
+        """Create basic Linux directories: /bin, /etc, /home/operative, /root, /tmp, /var, /var/log."""
         for path in [
             "/bin",
             "/etc",
             "/home",
             self.home_dir,
+            "/root",
             "/tmp",
             "/var",
             "/var/log",
         ]:
             self.mkdir_p(path)
+
+        # Pre-seed mission target files for narrative quest continuity
+        run_script = self.touch(f"{self.home_dir}/run.sh")
+        run_script.write('#!/bin/bash\necho "Execution Core operational."\n')
+        run_script.chmod(0o644)
+
+        fw_log = self.touch(f"{self.home_dir}/firewall.log")
+        fw_log.write("ERROR: Security perimeter breached.\nALERT: Sentinel Overlord daemon detected.\n")
 
     # -------------------------------------------------------------------------
     # Path Normalization and Resolution

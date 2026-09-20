@@ -13,11 +13,13 @@ import os
 import sys
 import unittest
 
-# Ensure 'src' is on sys.path
+# Ensure 'src' and project root are on sys.path
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 SRC_DIR = os.path.join(PROJECT_ROOT, "src")
 if SRC_DIR not in sys.path:
     sys.path.insert(0, SRC_DIR)
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
 from cybershell.contracts import (  # noqa: E402
     DEFAULT_BACKLASH_DAMAGE,
@@ -325,6 +327,47 @@ class TestCyberShellIntegration(unittest.TestCase):
         self.assertIn(0, self.player.completed_sectors)
         self.assertEqual(self.player.current_sector, 1)
         self.assertEqual(len(self.player.inventory), 1)
+
+    def test_full_six_sector_campaign_progression(self) -> None:
+        """Verify seamless quest completion and sector advancement from Sector 0 to Sector 5."""
+        from cybershell.engine.interpreter import Interpreter
+        from cybershell.game.evaluator import QuestEvaluator
+        from cybershell.game.quests import get_sector_quests
+
+        vfs = VirtualFileSystem(default_user="operative")
+        interpreter = Interpreter(vfs=vfs)
+        evaluator = QuestEvaluator()
+        player = PlayerStats(character_name="Byte", hp=100, max_hp=100, xp=0, current_sector=0)
+        all_quests = get_sector_quests()
+
+        campaign_actions = [
+            (0, "pwd"),
+            (1, "touch intel.txt"),
+            (2, "mkdir backup"),
+            (3, "chmod 755 run.sh"),
+            (4, "cat firewall.log"),
+            (5, "cd /root"),
+        ]
+
+        for sector_id, command in campaign_actions:
+            self.assertEqual(player.current_sector, sector_id)
+            quest = all_quests[sector_id]
+            cmd_res = interpreter.execute(command)
+            self.assertEqual(cmd_res.exit_code, 0)
+            is_completed, newly = evaluator.check_quest_progress(quest, vfs, player)
+            self.assertTrue(is_completed)
+            self.assertGreater(len(newly), 0)
+            self.assertIn(sector_id, player.completed_sectors)
+
+            # Advance sector if available
+            next_sector = player.current_sector + 1
+            if next_sector in all_quests:
+                player.current_sector = next_sector
+
+        # Verify all 6 sectors are completed and legendary loot acquired
+        self.assertEqual(len(player.completed_sectors), 6)
+        self.assertTrue(player.has_item("item_root_access"))
+        self.assertGreater(player.level, 20)
 
 
 if __name__ == "__main__":
