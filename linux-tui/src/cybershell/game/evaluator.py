@@ -44,10 +44,10 @@ class QuestEvaluator:
                 if node is None:
                     return False
                 # Assuming node has a 'permissions' attribute as per VFS design
-                return str(getattr(node, "permissions", "")) == str(expected)
+                return str(getattr(node, "mode_octal", "")) == str(expected)
 
             elif ptype == "cwd_equals":
-                return vfs.get_cwd_path() == str(expected)
+                return vfs.get_cwd_path() == str(target)
 
             else:
                 # Unknown predicate type
