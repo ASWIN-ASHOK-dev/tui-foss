@@ -193,6 +193,7 @@ class RPGApp:
         self.hp = hp
         self.max_hp = max_hp
         self.xp = xp
+        self.inventory = []
         self.current_screen = self.SCREEN_TITLE
 
         # Gautham's visual components
@@ -407,6 +408,36 @@ class RPGApp:
         door = self.minigame.render_door()
         return header + "\n" + door
 
+    def render_inventory(self, width: int) -> str:
+        """Render the Operative's Inventory screen."""
+        header = draw_double_header(
+            self.character_name,
+            self.hp,
+            self.max_hp,
+            self.xp,
+            "OPERATIVE INVENTORY",
+            width,
+        )
+
+        content = ["[ EQUIPMENT & LOOT ]", ""]
+        if not self.inventory:
+            content.append("  Inventory is empty.")
+            content.append("  Complete objectives and missions to earn loot.")
+        else:
+            for item in self.inventory:
+                name = item.name if hasattr(item, 'name') else str(item)
+                desc = item.description if hasattr(item, 'description') else ""
+                rarity = getattr(item, 'rarity', 'common').upper()
+                content.append(f"  [{rarity}] {name}")
+                if desc:
+                    content.append(f"      - {desc}")
+                content.append("")
+        content.append("")
+        content.append("Press Enter to return.")
+
+        panel_lines = draw_panel("INVENTORY", content, width - 4)
+        return header + "\n" + "\n".join(panel_lines)
+
     def render(self) -> str:
         """Render the currently active screen."""
         width, _ = terminal_size()
@@ -421,7 +452,7 @@ class RPGApp:
             return self.render_codex(width)
 
         if self.current_screen == self.SCREEN_INVENTORY:
-            return self.render_simple_screen("INVENTORY", width)
+            return self.render_inventory(width)
 
         if self.current_screen == self.SCREEN_MAP:
             return self.render_map(width)
