@@ -510,13 +510,13 @@ def explain_command(
         if args:
             mode = args[0]
             lines.append(f"  {YELLOW}Mode {mode}{RESET} : 3 octal digits [Owner][Group][Others].")
-            lines.append(f"    • 4 = Read (r), 2 = Write (w), 1 = Execute (x)")
+            lines.append("    • 4 = Read (r), 2 = Write (w), 1 = Execute (x)")
             if mode == "755":
-                lines.append(f"    • 7 (4+2+1=rwx) for Owner, 5 (4+0+1=r-x) for Group & Others.")
+                lines.append("    • 7 (4+2+1=rwx) for Owner, 5 (4+0+1=r-x) for Group & Others.")
             elif mode == "644":
-                lines.append(f"    • 6 (4+2+0=rw-) for Owner, 4 (4+0+0=r--) for Group & Others.")
+                lines.append("    • 6 (4+2+0=rw-) for Owner, 4 (4+0+0=r--) for Group & Others.")
             elif mode == "700":
-                lines.append(f"    • 7 (rwx) for Owner, 0 (---) for others (strictly private).")
+                lines.append("    • 7 (rwx) for Owner, 0 (---) for others (strictly private).")
             if len(args) > 1:
                 lines.append(f"  {WHITE}Target file: {args[1]}{RESET}")
     elif cmd == "grep":
