@@ -116,11 +116,12 @@ def draw_double_header(
     xp: int,
     sector_title: str,
     width: int = 80,
+    styled: bool = False,
 ) -> str:
     """
     Render the CyberShell top HUD using a double border.
 
-    The returned string contains exactly three terminal lines.
+    The returned string contains exactly four terminal lines.
     """
     width = max(20, width)
 
@@ -134,67 +135,91 @@ def draw_double_header(
     hp_filled = round(hp_bar_width * hp_percent / 100)
     hp_bar = "█" * hp_filled + "░" * (hp_bar_width - hp_filled)
 
-    line_one = (
-        f"OPERATIVE: {character_name}"
-        f"    HP: [{hp_bar}] {hp_percent:>3}%"
-        f"    XP: {xp}"
-    )
+    if styled:
+        if hp_percent > 50:
+            hp_color = "\033[92m"  # Bright Green
+        elif hp_percent > 20:
+            hp_color = "\033[93m"  # Bright Yellow
+        else:
+            hp_color = "\033[91m"  # Bright Red
 
-    line_two = sector_title
+        line_one = (
+            f"\033[1;96mOPERATIVE:\033[0m \033[1;97m{character_name}\033[0m"
+            f"    \033[1;97mHP:\033[0m [{hp_color}{hp_bar}\033[0m] \033[1;97m{hp_percent:>3}%\033[0m"
+            f"    \033[1;95mXP:\033[0m \033[1;97m{xp}\033[0m"
+        )
+        line_two = f"\033[1;93m{sector_title}\033[0m"
+        b_col = "\033[96m"
+        b_rst = "\033[0m"
+    else:
+        line_one = (
+            f"OPERATIVE: {character_name}"
+            f"    HP: [{hp_bar}] {hp_percent:>3}%"
+            f"    XP: {xp}"
+        )
+        line_two = sector_title
+        b_col = ""
+        b_rst = ""
 
     line_one = pad_to_width(line_one, inner_width)
     line_two = pad_to_width(line_two, inner_width, "center")
 
     return "\n".join(
         [
-            TOP_LEFT + horizontal_line(inner_width) + TOP_RIGHT,
-            VERTICAL + line_one + VERTICAL,
-            VERTICAL + line_two + VERTICAL,
-            BOTTOM_LEFT + horizontal_line(inner_width) + BOTTOM_RIGHT,
+            b_col + TOP_LEFT + horizontal_line(inner_width) + TOP_RIGHT + b_rst,
+            b_col + VERTICAL + b_rst + line_one + b_col + VERTICAL + b_rst,
+            b_col + VERTICAL + b_rst + line_two + b_col + VERTICAL + b_rst,
+            b_col + BOTTOM_LEFT + horizontal_line(inner_width) + BOTTOM_RIGHT + b_rst,
         ]
     )
 
 
-def draw_panel(title: str, content: Iterable[str], width: int) -> List[str]:
+def draw_panel(
+    title: str,
+    content: Iterable[str],
+    width: int,
+    styled: bool = False,
+    border_color: str = "",
+) -> List[str]:
     """Render one rounded-border panel."""
     width = max(8, width)
     inner_width = width - 2
     content_width = inner_width - 2
 
+    b_col = border_color if styled else ""
+    b_rst = "\033[0m" if styled and b_col else ""
+
     lines = [
-        PANEL_TOP_LEFT
-        + PANEL_HORIZONTAL * (width - 2)
-        + PANEL_TOP_RIGHT
+        b_col + PANEL_TOP_LEFT + PANEL_HORIZONTAL * (width - 2) + PANEL_TOP_RIGHT + b_rst
     ]
 
     title_text = truncate_styled(f" {title} ", content_width)
 
     lines.append(
-        PANEL_VERTICAL
+        b_col + PANEL_VERTICAL + b_rst
         + " "
         + pad_to_width(title_text, content_width)
         + " "
-        + PANEL_VERTICAL
+        + b_col + PANEL_VERTICAL + b_rst
     )
 
     for item in content:
         item = truncate_styled(str(item), content_width)
 
         lines.append(
-            PANEL_VERTICAL
+            b_col + PANEL_VERTICAL + b_rst
             + " "
             + pad_to_width(item, content_width)
             + " "
-            + PANEL_VERTICAL
+            + b_col + PANEL_VERTICAL + b_rst
         )
 
     lines.append(
-        PANEL_BOTTOM_LEFT
-        + PANEL_HORIZONTAL * (width - 2)
-        + PANEL_BOTTOM_RIGHT
+        b_col + PANEL_BOTTOM_LEFT + PANEL_HORIZONTAL * (width - 2) + PANEL_BOTTOM_RIGHT + b_rst
     )
 
     return lines
+
 
 def draw_split_panels(
     left_title: str,
@@ -203,6 +228,7 @@ def draw_split_panels(
     right_content: Iterable[str],
     width: int = 80,
     gap: int = 2,
+    styled: bool = False,
 ) -> str:
     """
     Render Mission Intel and Terminal as side-by-side panels.
@@ -214,8 +240,19 @@ def draw_split_panels(
     left_width = available // 2
     right_width = available - left_width
 
-    left = draw_panel(left_title, left_content, left_width)
-    right = draw_panel(right_title, right_content, right_width)
+    left_border = "\033[96m" if styled else ""
+    right_border = "\033[92m" if styled else ""
+
+    left_items = list(left_content)
+    right_items = list(right_content)
+    target_height = max(len(left_items), len(right_items))
+
+    # Pad inner content so both panels have matching side borders and bottom borders
+    left_items += [""] * (target_height - len(left_items))
+    right_items += [""] * (target_height - len(right_items))
+
+    left = draw_panel(left_title, left_items, left_width, styled=styled, border_color=left_border)
+    right = draw_panel(right_title, right_items, right_width, styled=styled, border_color=right_border)
 
     height = max(len(left), len(right))
 

@@ -19,6 +19,9 @@ class ShellInterpreter:
 
     def execute(self, command_line: str) -> CommandResult:
         """Execute one command line and apply combat backlash to invalid syntax/commands."""
+        if hasattr(self.vfs, "last_command"):
+            self.vfs.last_command = command_line
+
         tokens, error = self.tokenize(command_line)
         if error is not None:
             return self._with_backlash(error)

@@ -85,6 +85,9 @@ class Objective:
     id: str
     description: str
     hint: str = ""
+    command: str = ""
+    syntax: str = ""
+    explanation: str = ""
     predicate_type: str = "file_exists"  # file_exists, file_not_exists, file_contains, permission_equals, cwd_equals
     predicate_target: str = ""
     predicate_expected: Any = True
@@ -102,6 +105,9 @@ class Objective:
             id=str(data.get("id", "")),
             description=str(data.get("description", "")),
             hint=str(data.get("hint", "")),
+            command=str(data.get("command", "")),
+            syntax=str(data.get("syntax", "")),
+            explanation=str(data.get("explanation", "")),
             predicate_type=str(data.get("predicate_type", "file_exists")),
             predicate_target=str(data.get("predicate_target", "")),
             predicate_expected=data.get("predicate_expected", True),
@@ -240,6 +246,13 @@ class PlayerStats:
     def has_item(self, item_id: str) -> bool:
         """Check if an item ID exists in inventory."""
         return any(item.id == item_id for item in self.inventory)
+
+    def mark_sector_completed(self, sector_id: int) -> None:
+        """Add sector_id to completed_sectors safely whether backed by list or set."""
+        if isinstance(self.completed_sectors, set):
+            self.completed_sectors.add(sector_id)
+        elif sector_id not in self.completed_sectors:
+            self.completed_sectors.append(sector_id)
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialize player state for local JSON persistence."""
