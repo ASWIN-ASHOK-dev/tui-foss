@@ -341,22 +341,24 @@ class TestCyberShellIntegration(unittest.TestCase):
         all_quests = get_sector_quests()
 
         campaign_actions = [
-            (0, "pwd"),
-            (1, "touch intel.txt"),
-            (2, "mkdir backup"),
-            (3, "chmod 755 run.sh"),
-            (4, "cat firewall.log"),
-            (5, "cd /root"),
+            (0, ["pwd", "ls -la", "touch beacon.log"]),
+            (1, ["touch intel.txt", "cp intel.txt intel.bak", 'echo "OMNICORP" > intel.txt']),
+            (2, ["mkdir backup", "cd backup", "touch packet.dump"]),
+            (3, ["chmod 755 /home/operative/run.sh", "chmod 600 /home/operative/firewall.log", "touch /home/operative/exploit.sh"]),
+            (4, ["cat /home/operative/firewall.log", 'echo "BYPASS_ALPHA" >> /home/operative/firewall.log', "mkdir -p /home/operative/exploits"]),
+            (5, ["cd /root", "touch /root/override.lock", 'echo "SYSTEM_RESTORED" > /root/core.flag']),
         ]
 
-        for sector_id, command in campaign_actions:
+        for sector_id, cmds in campaign_actions:
             self.assertEqual(player.current_sector, sector_id)
             quest = all_quests[sector_id]
-            cmd_res = interpreter.execute(command)
-            self.assertEqual(cmd_res.exit_code, 0)
-            is_completed, newly = evaluator.check_quest_progress(quest, vfs, player)
-            self.assertTrue(is_completed)
-            self.assertGreater(len(newly), 0)
+            for command in cmds:
+                cmd_res = interpreter.execute(command)
+                self.assertEqual(cmd_res.exit_code, 0)
+                evaluator.check_quest_progress(quest, vfs, player)
+
+            self.assertTrue(quest.is_completed)
+            self.assertTrue(quest.completed)
             self.assertIn(sector_id, player.completed_sectors)
 
             # Advance sector if available
@@ -368,6 +370,191 @@ class TestCyberShellIntegration(unittest.TestCase):
         self.assertEqual(len(player.completed_sectors), 6)
         self.assertTrue(player.has_item("item_root_access"))
         self.assertGreater(player.level, 20)
+
+    # -------------------------------------------------------------------------
+    # 8. Beginner Assist Toolkit & Persistence Validation
+    # -------------------------------------------------------------------------
+
+    def test_persistence_save_load_and_delete(self) -> None:
+        """Verify checkpoint save, load, and deletion preserve operative progression."""
+        import tempfile
+        from cybershell.run import delete_saved_game, load_saved_game, save_game
+
+        with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as tmp:
+            tmp_path = tmp.name
+
+        try:
+            player = PlayerStats(
+                character_name="Nova",
+                hp=85,
+                max_hp=100,
+                xp=275,
+                current_sector=2,
+            )
+            player.level = 3
+            player.rank = "Specialist"
+            player.completed_sectors = {0, 1}
+            player.add_item(
+                Item(id="chip_1", name="Data Chip", description="Encrypted", category="token")
+            )
+
+            # 1. Save state
+            saved = save_game(player, cadet_mode=True, filepath=tmp_path)
+            self.assertTrue(saved)
+            self.assertTrue(os.path.isfile(tmp_path))
+
+            # 2. Load state
+            loaded = load_saved_game(filepath=tmp_path)
+            self.assertIsNotNone(loaded)
+            loaded_player, cadet_mode = loaded
+            self.assertEqual(loaded_player.character_name, "Nova")
+            self.assertEqual(loaded_player.hp, 85)
+            self.assertEqual(loaded_player.xp, 275)
+            self.assertEqual(loaded_player.current_sector, 2)
+            self.assertEqual(loaded_player.completed_sectors, {0, 1})
+            self.assertTrue(loaded_player.has_item("chip_1"))
+            self.assertTrue(cadet_mode)
+
+            # 3. Delete save
+            deleted = delete_saved_game(filepath=tmp_path)
+            self.assertTrue(deleted)
+            self.assertFalse(os.path.isfile(tmp_path))
+        finally:
+            if os.path.isfile(tmp_path):
+                os.remove(tmp_path)
+
+    def test_typo_and_syntax_coach(self) -> None:
+        """Verify typo coach detects common missing spaces and misspellings."""
+        from cybershell.run import check_typo_or_syntax
+
+        # Missing spaces after commands
+        t1 = check_typo_or_syntax("cd..")
+        self.assertIsNotNone(t1)
+        self.assertEqual(t1[0], "cd ..")
+
+        t2 = check_typo_or_syntax("cd/")
+        self.assertIsNotNone(t2)
+        self.assertEqual(t2[0], "cd /")
+
+        t3 = check_typo_or_syntax("ls-la")
+        self.assertIsNotNone(t3)
+        self.assertEqual(t3[0], "ls -la")
+
+        t4 = check_typo_or_syntax("catfirewall.log")
+        self.assertIsNotNone(t4)
+        self.assertEqual(t4[0], "cat firewall.log")
+
+        # Misspelled commands
+        t5 = check_typo_or_syntax("pdw")
+        self.assertIsNotNone(t5)
+        self.assertEqual(t5[0], "pwd")
+
+        t6 = check_typo_or_syntax("sl")
+        self.assertIsNotNone(t6)
+        self.assertEqual(t6[0], "ls")
+
+        # Valid commands should return None
+        self.assertIsNone(check_typo_or_syntax("pwd"))
+        self.assertIsNone(check_typo_or_syntax("ls -la"))
+        self.assertIsNone(check_typo_or_syntax("cd .."))
+
+    def test_directory_tree_rendering(self) -> None:
+        """Verify visual directory tree generates Unicode branches and color-coded nodes."""
+        from cybershell.run import render_vfs_tree
+
+        tree_lines = render_vfs_tree(self.vfs.root, max_depth=2)
+        combined = "\n".join(tree_lines)
+        self.assertIn("/", tree_lines[0])
+        self.assertTrue(any("bin/" in line for line in tree_lines))
+        self.assertTrue(any("home/" in line for line in tree_lines))
+        self.assertTrue("├──" in combined or "└──" in combined)
+
+    def test_command_explainer(self) -> None:
+        """Verify interactive command explainer breaks down syntax and flags."""
+        from cybershell.run import explain_command
+
+        obj = Objective(
+            id="obj_test",
+            description="Verify working coordinates.",
+            command="pwd",
+            syntax="pwd",
+            explanation="Prints absolute directory path coordinates.",
+        )
+
+        # Active objective explainer
+        expl_active = explain_command("explain", active_obj=obj)
+        self.assertTrue(any("pwd" in line for line in expl_active))
+        self.assertTrue(any("Prints absolute directory path" in line for line in expl_active))
+
+        # Explicit command explainer
+        expl_chmod = explain_command("explain chmod 755 script.sh")
+        self.assertTrue(any("Change Mode" in line for line in expl_chmod))
+        self.assertTrue(any("755" in line for line in expl_chmod))
+
+    def test_progressive_hints(self) -> None:
+        """Verify 3-tier progressive hints provide clues and apply difficulty damage rules."""
+        from cybershell.run import get_progressive_hint
+
+        obj = Objective(
+            id="obj_hint",
+            description="Identify filesystem coordinates.",
+            command="pwd",
+            syntax="pwd",
+            explanation="Prints current directory path.",
+            hint="Type 'pwd' and press Enter.",
+        )
+
+        # Cadet mode: hints are free (cost == 0)
+        h1, c1 = get_progressive_hint(obj, tier=1, cadet_mode=True)
+        self.assertIn("HINT TIER 1", h1)
+        self.assertEqual(c1, 0)
+
+        h2, c2 = get_progressive_hint(obj, tier=2, cadet_mode=True)
+        self.assertIn("HINT TIER 2", h2)
+        self.assertEqual(c2, 0)
+
+        h3, c3 = get_progressive_hint(obj, tier=3, cadet_mode=True)
+        self.assertIn("HINT TIER 3", h3)
+        self.assertEqual(c3, 0)
+
+        # Operative mode: hints incur HP penalties
+        _, op_c1 = get_progressive_hint(obj, tier=1, cadet_mode=False)
+        _, op_c2 = get_progressive_hint(obj, tier=2, cadet_mode=False)
+        _, op_c3 = get_progressive_hint(obj, tier=3, cadet_mode=False)
+        self.assertGreater(op_c1, 0)
+        self.assertGreater(op_c2, op_c1)
+        self.assertGreater(op_c3, op_c2)
+
+    def test_colorize_ls_output(self) -> None:
+        """Verify colorize_ls_output formats directory and file entries with ANSI colors."""
+        from cybershell.run import colorize_ls_output
+
+        raw_ls = "drwxr-xr-x 2 root root 4096 Sep 20 21:00 bin\n-rw-r--r-- 1 operative operative 128 Sep 20 21:00 notes.txt\n"
+        colored = colorize_ls_output(raw_ls)
+        self.assertEqual(len(colored), 2)
+        self.assertTrue(any("\033[" in line for line in colored))
+
+    def test_render_opening_screen_layout(self) -> None:
+        """Verify opening screen renders clean description, complete sentences, and station options."""
+        from cybershell.run import render_opening_screen
+
+        player = PlayerStats(character_name="Cipher", hp=100, max_hp=100, xp=50, current_sector=1)
+        screen_text = render_opening_screen(player, width=80, cadet_mode=True, has_save=False)
+
+        # Verify key sections
+        self.assertIn("CYBERSHELL", screen_text)
+        self.assertIn("Operative:", screen_text)
+        self.assertIn("CADET: SAFE", screen_text)
+        self.assertIn("WHAT IS CYBERSHELL?", screen_text)
+        self.assertIn("MAIN DIRECTORY // SELECT STATION", screen_text)
+        self.assertIn("Learning Interface", screen_text)
+        self.assertIn("Hacker Codex", screen_text)
+
+        # Verify with saved game
+        save_screen = render_opening_screen(player, width=80, cadet_mode=False, has_save=True)
+        self.assertIn("Continue Campaign", save_screen)
+        self.assertIn("New Campaign", save_screen)
+        self.assertIn("OPERATIVE: -15 HP", save_screen)
 
 
 if __name__ == "__main__":

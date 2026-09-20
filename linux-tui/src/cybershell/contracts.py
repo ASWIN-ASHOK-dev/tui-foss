@@ -85,6 +85,9 @@ class Objective:
     id: str
     description: str
     hint: str = ""
+    command: str = ""
+    syntax: str = ""
+    explanation: str = ""
     predicate_type: str = "file_exists"  # file_exists, file_not_exists, file_contains, permission_equals, cwd_equals
     predicate_target: str = ""
     predicate_expected: Any = True
@@ -102,6 +105,9 @@ class Objective:
             id=str(data.get("id", "")),
             description=str(data.get("description", "")),
             hint=str(data.get("hint", "")),
+            command=str(data.get("command", "")),
+            syntax=str(data.get("syntax", "")),
+            explanation=str(data.get("explanation", "")),
             predicate_type=str(data.get("predicate_type", "file_exists")),
             predicate_target=str(data.get("predicate_target", "")),
             predicate_expected=data.get("predicate_expected", True),
