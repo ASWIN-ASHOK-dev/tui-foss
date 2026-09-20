@@ -4,16 +4,16 @@ Author: Aswin (Game State, Progression & Evaluator)
 """
 
 import os
-import json
-import pytest
+import unittest
 
-from cybershell.contracts import Objective, Quest, PlayerStats, Item
-from cybershell.game.state import SaveManager, SAVE_FILE_PATH
+from cybershell.contracts import Item
+from cybershell.game.state import SaveManager
 from cybershell.game.evaluator import QuestEvaluator
+from tests.conftest import MockGameState
 
 class MockNode:
-    def __init__(self, permissions="755"):
-        self.permissions = permissions
+    def __init__(self, mode_octal="755"):
+        self.mode_octal = mode_octal
 
 class MockVFS:
     """A mock implementation of VFSProtocol for testing evaluator."""
@@ -36,160 +36,158 @@ class MockVFS:
     def get_node(self, path: str):
         return self.nodes.get(path)
 
-@pytest.fixture
-def temp_save_file(tmp_path):
-    """Fixture to provide a temporary file path for SaveManager."""
-    save_path = tmp_path / ".cybershell_save.json"
-    return str(save_path)
+class TestGameStateAndEvaluator(unittest.TestCase):
 
-@pytest.fixture
-def evaluator():
-    return QuestEvaluator()
+    def setUp(self):
+        self.temp_save_file = ".cybershell_test_save.json"
+        if os.path.exists(self.temp_save_file):
+            os.remove(self.temp_save_file)
+        self.evaluator = QuestEvaluator()
+        self.mock_vfs = MockVFS()
+        self.mock_player = MockGameState.create_player()
+        self.sample_objective = MockGameState.create_objective()
+        
+        # Test full quest progression and rewards.
+        # mock_quest has 2 objectives (cwd_equals /home/operative, file_exists /tmp/flag)
+        self.mock_quest = MockGameState.create_quest(0)
+        
+        # Override objectives to match exactly what test_check_quest_progress expects
+        self.mock_quest.objectives[0].predicate_type = "cwd_equals"
+        self.mock_quest.objectives[0].predicate_target = "/home/operative"
+        self.mock_quest.objectives[0].predicate_expected = True
+        self.mock_quest.objectives[0].xp_reward = 50
 
-@pytest.fixture
-def mock_vfs():
-    return MockVFS()
+        self.mock_quest.objectives[1].predicate_type = "file_exists"
+        self.mock_quest.objectives[1].predicate_target = "/tmp/flag"
+        self.mock_quest.objectives[1].predicate_expected = True
+        self.mock_quest.objectives[1].xp_reward = 50
+        
+        self.mock_quest.reward_xp = 100
+        self.mock_quest.reward_item = Item(id="chip", name="Chip", description="Loot", category="chip", rarity="common", properties={"decrypt_power": 10})
 
-def test_save_and_load_state(temp_save_file, mock_player):
-    """Test that SaveManager can serialize and deserialize PlayerStats correctly."""
-    # Modify player to test non-default values
-    mock_player.gain_xp(150) # Level 2 requires 100 xp
-    mock_player.hp = 85
-    mock_player.add_item(Item(id="test_item", name="Test Item", description="A test item."))
-    
-    assert mock_player.level == 2
-    assert mock_player.rank == "Junior Operative"
+    def tearDown(self):
+        if os.path.exists(self.temp_save_file):
+            os.remove(self.temp_save_file)
 
-    # Save to temp file
-    assert SaveManager.save_state(mock_player, file_path=temp_save_file)
-    assert os.path.exists(temp_save_file)
+    def test_save_and_load_state(self):
+        """Test that SaveManager can serialize and deserialize PlayerStats correctly."""
+        # Modify player to test non-default values
+        self.mock_player.gain_xp(150) # Level 2 requires 100 xp
+        self.mock_player.hp = 85
+        self.mock_player.add_item(Item(id="test_item", name="Test Item", description="A test item.", category="misc", rarity="common", properties={}))
+        
+        self.assertEqual(self.mock_player.level, 2)
+        self.assertEqual(self.mock_player.rank, "Junior Operative")
 
-    # Load from temp file
-    loaded_player = SaveManager.load_state(file_path=temp_save_file)
+        # Save to temp file
+        self.assertTrue(SaveManager.save_state(self.mock_player, file_path=self.temp_save_file))
+        self.assertTrue(os.path.exists(self.temp_save_file))
 
-    assert loaded_player.character_name == mock_player.character_name
-    assert loaded_player.hp == 85
-    assert loaded_player.level == 2
-    assert loaded_player.xp == 150
-    assert loaded_player.rank == "Junior Operative"
-    assert len(loaded_player.inventory) == 1
-    assert loaded_player.inventory[0].id == "test_item"
+        # Load from temp file
+        loaded_player = SaveManager.load_state(file_path=self.temp_save_file)
 
-def test_load_state_no_file(temp_save_file):
-    """Test that load_state returns a fresh player if the save file doesn't exist."""
-    assert not os.path.exists(temp_save_file)
-    player = SaveManager.load_state(file_path=temp_save_file)
-    assert player.level == 1
-    assert player.hp == 100
-    assert player.xp == 0
+        self.assertEqual(loaded_player.character_name, self.mock_player.character_name)
+        self.assertEqual(loaded_player.hp, 85)
+        self.assertEqual(loaded_player.level, 2)
+        self.assertEqual(loaded_player.xp, 150)
+        self.assertEqual(loaded_player.rank, "Junior Operative")
+        self.assertEqual(len(loaded_player.inventory), 1)
+        self.assertEqual(loaded_player.inventory[0].id, "test_item")
 
-def test_evaluate_cwd_equals(evaluator, mock_vfs, mock_player, sample_objective):
-    """Test cwd_equals predicate."""
-    sample_objective.predicate_type = "cwd_equals"
-    sample_objective.predicate_target = ""
-    sample_objective.predicate_expected = "/home/operative"
-    
-    mock_vfs.cwd = "/home/operative"
-    assert evaluator.evaluate_objective(sample_objective, mock_vfs, mock_player)
+    def test_load_state_no_file(self):
+        """Test that load_state returns a fresh player if the save file doesn't exist."""
+        self.assertFalse(os.path.exists(self.temp_save_file))
+        player = SaveManager.load_state(file_path=self.temp_save_file)
+        self.assertEqual(player.level, 1)
+        self.assertEqual(player.hp, 100)
+        self.assertEqual(player.xp, 0)
 
-    mock_vfs.cwd = "/root"
-    assert not evaluator.evaluate_objective(sample_objective, mock_vfs, mock_player)
+    def test_evaluate_cwd_equals(self):
+        """Test cwd_equals predicate."""
+        self.sample_objective.predicate_type = "cwd_equals"
+        self.sample_objective.predicate_target = "/home/operative"
+        self.sample_objective.predicate_expected = True
+        
+        self.mock_vfs.cwd = "/home/operative"
+        self.assertTrue(self.evaluator.evaluate_objective(self.sample_objective, self.mock_vfs, self.mock_player))
 
-def test_evaluate_file_exists(evaluator, mock_vfs, mock_player, sample_objective):
-    """Test file_exists and file_not_exists predicates."""
-    sample_objective.predicate_target = "/etc/passwd"
-    
-    sample_objective.predicate_type = "file_exists"
-    sample_objective.predicate_expected = True
-    assert not evaluator.evaluate_objective(sample_objective, mock_vfs, mock_player)
-    
-    mock_vfs.files["/etc/passwd"] = "root:x:0:0:"
-    assert evaluator.evaluate_objective(sample_objective, mock_vfs, mock_player)
+        self.mock_vfs.cwd = "/root"
+        self.assertFalse(self.evaluator.evaluate_objective(self.sample_objective, self.mock_vfs, self.mock_player))
 
-    sample_objective.predicate_type = "file_not_exists"
-    sample_objective.predicate_expected = True
-    assert not evaluator.evaluate_objective(sample_objective, mock_vfs, mock_player)
+    def test_evaluate_file_exists(self):
+        """Test file_exists and file_not_exists predicates."""
+        self.sample_objective.predicate_target = "/etc/passwd"
+        
+        self.sample_objective.predicate_type = "file_exists"
+        self.sample_objective.predicate_expected = True
+        self.assertFalse(self.evaluator.evaluate_objective(self.sample_objective, self.mock_vfs, self.mock_player))
+        
+        self.mock_vfs.files["/etc/passwd"] = "root:x:0:0:"
+        self.assertTrue(self.evaluator.evaluate_objective(self.sample_objective, self.mock_vfs, self.mock_player))
 
-def test_evaluate_file_contains(evaluator, mock_vfs, mock_player, sample_objective):
-    """Test file_contains predicate."""
-    sample_objective.predicate_type = "file_contains"
-    sample_objective.predicate_target = "/home/operative/log.txt"
-    sample_objective.predicate_expected = "ERROR"
+        self.sample_objective.predicate_type = "file_not_exists"
+        self.sample_objective.predicate_expected = True
+        self.assertFalse(self.evaluator.evaluate_objective(self.sample_objective, self.mock_vfs, self.mock_player))
 
-    # File doesn't exist yet
-    assert not evaluator.evaluate_objective(sample_objective, mock_vfs, mock_player)
-    
-    # File exists, but doesn't contain ERROR
-    mock_vfs.files["/home/operative/log.txt"] = "INFO: All systems green."
-    assert not evaluator.evaluate_objective(sample_objective, mock_vfs, mock_player)
+    def test_evaluate_file_contains(self):
+        """Test file_contains predicate."""
+        self.sample_objective.predicate_type = "file_contains"
+        self.sample_objective.predicate_target = "/home/operative/log.txt"
+        self.sample_objective.predicate_expected = "ERROR"
 
-    # File contains ERROR
-    mock_vfs.files["/home/operative/log.txt"] = "INFO: green\nERROR: CPU overloaded!"
-    assert evaluator.evaluate_objective(sample_objective, mock_vfs, mock_player)
+        # File doesn't exist yet
+        self.assertFalse(self.evaluator.evaluate_objective(self.sample_objective, self.mock_vfs, self.mock_player))
+        
+        # File exists, but doesn't contain ERROR
+        self.mock_vfs.files["/home/operative/log.txt"] = "INFO: All systems green."
+        self.assertFalse(self.evaluator.evaluate_objective(self.sample_objective, self.mock_vfs, self.mock_player))
 
-def test_evaluate_permission_equals(evaluator, mock_vfs, mock_player, sample_objective):
-    """Test permission_equals predicate."""
-    sample_objective.predicate_type = "permission_equals"
-    sample_objective.predicate_target = "/home/operative/script.sh"
-    sample_objective.predicate_expected = "755"
+        # File contains ERROR
+        self.mock_vfs.files["/home/operative/log.txt"] = "INFO: green\nERROR: CPU overloaded!"
+        self.assertTrue(self.evaluator.evaluate_objective(self.sample_objective, self.mock_vfs, self.mock_player))
 
-    assert not evaluator.evaluate_objective(sample_objective, mock_vfs, mock_player)
+    def test_evaluate_permission_equals(self):
+        """Test permission_equals predicate."""
+        self.sample_objective.predicate_type = "permission_equals"
+        self.sample_objective.predicate_target = "/home/operative/script.sh"
+        self.sample_objective.predicate_expected = "755"
 
-    mock_vfs.nodes["/home/operative/script.sh"] = MockNode("644")
-    assert not evaluator.evaluate_objective(sample_objective, mock_vfs, mock_player)
+        self.assertFalse(self.evaluator.evaluate_objective(self.sample_objective, self.mock_vfs, self.mock_player))
 
-    mock_vfs.nodes["/home/operative/script.sh"].permissions = "755"
-    assert evaluator.evaluate_objective(sample_objective, mock_vfs, mock_player)
+        self.mock_vfs.nodes["/home/operative/script.sh"] = MockNode("644")
+        self.assertFalse(self.evaluator.evaluate_objective(self.sample_objective, self.mock_vfs, self.mock_player))
 
-def test_check_quest_progress(evaluator, mock_vfs, mock_player, mock_quest):
-    """Test full quest progression and rewards."""
-    # mock_quest has 2 objectives (cwd_equals /home/operative, cwd_equals /home/operative)
-    # Let's adjust them for a proper test
-    mock_quest.objectives[0].predicate_type = "cwd_equals"
-    mock_quest.objectives[0].predicate_expected = "/home/operative"
-    mock_quest.objectives[0].xp_reward = 50
+        self.mock_vfs.nodes["/home/operative/script.sh"].mode_octal = "755"
+        self.assertTrue(self.evaluator.evaluate_objective(self.sample_objective, self.mock_vfs, self.mock_player))
 
-    mock_quest.objectives[1].predicate_type = "file_exists"
-    mock_quest.objectives[1].predicate_target = "/tmp/flag"
-    mock_quest.objectives[1].predicate_expected = True
-    mock_quest.objectives[1].xp_reward = 50
-    
-    mock_quest.reward_xp = 100
-    mock_quest.reward_item = Item(id="chip", name="Chip", description="Loot")
+    def test_check_quest_progress(self):
+        """Test full quest progression and rewards."""
+        self.mock_vfs.cwd = "/home/operative"
+        # First objective will pass, second will fail (file doesn't exist)
+        
+        is_completed, newly_completed = self.evaluator.check_quest_progress(self.mock_quest, self.mock_vfs, self.mock_player)
+        
+        self.assertFalse(is_completed)
+        self.assertEqual(len(newly_completed), 1)
+        self.assertEqual(newly_completed[0], self.mock_quest.objectives[0].id)
+        self.assertTrue(self.mock_quest.objectives[0].completed)
+        self.assertEqual(self.mock_player.xp, 50)
+        self.assertFalse(self.mock_quest.completed)
 
-    mock_vfs.cwd = "/home/operative"
-    # First objective will pass, second will fail (file doesn't exist)
-    
-    is_completed, newly_completed = evaluator.check_quest_progress(mock_quest, mock_vfs, mock_player)
-    
-    assert not is_completed
-    assert len(newly_completed) == 1
-    assert newly_completed[0] == mock_quest.objectives[0].id
-    assert mock_quest.objectives[0].completed
-    assert mock_player.xp == 50
-    assert not mock_quest.completed
+        # Now make the second objective pass
+        self.mock_vfs.files["/tmp/flag"] = ""
+        is_completed, newly_completed = self.evaluator.check_quest_progress(self.mock_quest, self.mock_vfs, self.mock_player)
+        
+        self.assertTrue(is_completed)
+        self.assertTrue(self.mock_quest.completed)
+        self.assertEqual(len(newly_completed), 1)
+        self.assertEqual(newly_completed[0], self.mock_quest.objectives[1].id)
+        
+        self.assertEqual(self.mock_player.xp, 200)
+        self.assertEqual(self.mock_player.level, 3)
+        self.assertEqual(len(self.mock_player.inventory), 1)
+        self.assertEqual(self.mock_player.inventory[0].id, "chip")
+        self.assertIn(self.mock_quest.sector_id, self.mock_player.completed_sectors)
 
-    # Now make the second objective pass
-    mock_vfs.files["/tmp/flag"] = ""
-    is_completed, newly_completed = evaluator.check_quest_progress(mock_quest, mock_vfs, mock_player)
-    
-    assert is_completed
-    assert mock_quest.completed
-    assert len(newly_completed) == 1
-    assert newly_completed[0] == mock_quest.objectives[1].id
-    
-    # 50 + 50 (from objectives) + 100 (from quest completion) = 200 XP
-    # 200 XP is enough for Level 3 (lvl 1 -> lvl 2 at 100, lvl 2 -> lvl 3 at 200)
-    # Wait, the formula is while xp >= level * 100.
-    # Level 1: needs 100 to level up. Level 2 needs 200 to level up.
-    # Total xp = 200.
-    # Start level 1, xp = 200.
-    # 200 >= 1 * 100 -> level 2.
-    # 200 >= 2 * 100 -> level 3.
-    # So player should be Level 3.
-    
-    assert mock_player.xp == 200
-    assert mock_player.level == 3
-    assert len(mock_player.inventory) == 1
-    assert mock_player.inventory[0].id == "chip"
-    assert mock_quest.sector_id in mock_player.completed_sectors
+if __name__ == "__main__":
+    unittest.main()

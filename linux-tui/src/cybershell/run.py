@@ -28,6 +28,9 @@ from cybershell.contracts import (
     Quest,
 )
 from cybershell.engine.vfs import VirtualFileSystem
+from cybershell.engine.interpreter import Interpreter
+from cybershell.game.evaluator import QuestEvaluator
+from cybershell.game.quests import get_sector_quests
 from cybershell.ui.renderer import draw_double_header, draw_split_panels, terminal_size
 from cybershell.ui.rpg_app import RPGApp
 
@@ -102,104 +105,6 @@ def run_demo(character_name: str) -> None:
     print(app.render())
 
 
-def execute_vfs_command(vfs: VirtualFileSystem, cmd_line: str) -> CommandResult:
-    """Execute basic shell commands directly against the VFS."""
-    line = cmd_line.strip()
-    if not line:
-        return CommandResult()
-
-    parts = line.split()
-    binary = parts[0]
-    args = parts[1:]
-
-    if binary == "pwd":
-        return CommandResult(stdout=f"{vfs.get_cwd_path()}\n", exit_code=0)
-
-    if binary == "cd":
-        target = args[0] if args else "~"
-        try:
-            new_path = vfs.cd(target)
-            return CommandResult(stdout="", exit_code=0, metadata={"cwd": new_path})
-        except Exception as err:
-            return CommandResult(stderr=f"cd: {err}\n", exit_code=1)
-
-    if binary == "ls":
-        show_hidden = "-a" in args or "-la" in args or "-al" in args
-        long_format = "-l" in args or "-la" in args or "-al" in args
-        target = "."
-        for arg in args:
-            if not arg.startswith("-"):
-                target = arg
-                break
-        try:
-            nodes = vfs.list_dir(target, show_hidden=show_hidden)
-            lines = []
-            for node in nodes:
-                if long_format:
-                    from cybershell.engine.node import format_symbolic
-                    mode_str = format_symbolic(node.permissions, node.is_directory)
-                    size = node.size if node.is_file else 4096
-                    lines.append(f"{mode_str}  {node.owner}  {size:>6}  {node.name}")
-                else:
-                    lines.append(node.name)
-            output = "\n".join(lines) + ("\n" if lines else "")
-            return CommandResult(stdout=output, exit_code=0)
-        except Exception as err:
-            return CommandResult(stderr=f"ls: {err}\n", exit_code=1)
-
-    if binary == "echo":
-        text = " ".join(args).strip("'\"")
-        return CommandResult(stdout=f"{text}\n", exit_code=0)
-
-    if binary == "touch":
-        if not args:
-            return CommandResult(stderr="touch: missing file operand\n", exit_code=1)
-        try:
-            vfs.touch(args[0])
-            return CommandResult(stdout="", exit_code=0)
-        except Exception as err:
-            return CommandResult(stderr=f"touch: {err}\n", exit_code=1)
-
-    if binary == "mkdir":
-        if not args:
-            return CommandResult(stderr="mkdir: missing operand\n", exit_code=1)
-        try:
-            if "-p" in args:
-                target = [a for a in args if a != "-p"][0]
-                vfs.mkdir_p(target)
-            else:
-                vfs.mkdir(args[0])
-            return CommandResult(stdout="", exit_code=0)
-        except Exception as err:
-            return CommandResult(stderr=f"mkdir: {err}\n", exit_code=1)
-
-    if binary == "cat":
-        if not args:
-            return CommandResult(stderr="cat: missing file operand\n", exit_code=1)
-        try:
-            content = vfs.read_file(args[0])
-            return CommandResult(stdout=content + ("\n" if not content.endswith("\n") else ""), exit_code=0)
-        except Exception as err:
-            return CommandResult(stderr=f"cat: {err}\n", exit_code=1)
-
-    if binary == "chmod":
-        if len(args) < 2:
-            return CommandResult(stderr="chmod: missing operand\n", exit_code=1)
-        try:
-            vfs.chmod(args[1], args[0])
-            return CommandResult(stdout="", exit_code=0)
-        except Exception as err:
-            return CommandResult(stderr=f"chmod: {err}\n", exit_code=1)
-
-    # Unknown command -> Electrical backlash damage!
-    return CommandResult(
-        stdout="",
-        stderr=f"cybershell: command not found: {binary}\n",
-        exit_code=127,
-        backlash_damage=DEFAULT_BACKLASH_DAMAGE,
-    )
-
-
 def interactive_game_loop(character_name: str, start_sector: int) -> None:
     """Main interactive terminal loop for CyberShell RPG."""
     player = PlayerStats(
@@ -210,6 +115,8 @@ def interactive_game_loop(character_name: str, start_sector: int) -> None:
         current_sector=start_sector,
     )
     vfs = VirtualFileSystem(default_user="operative")
+    interpreter = Interpreter(vfs=vfs)
+    evaluator = QuestEvaluator()
     app = RPGApp(
         character_name=player.character_name,
         hp=player.hp,
@@ -218,44 +125,11 @@ def interactive_game_loop(character_name: str, start_sector: int) -> None:
     )
     app.set_screen(RPGApp.SCREEN_LAB)
 
-    # Initial Sector 0 Quest Setup
-    quest = Quest(
-        id=f"quest_sector_{start_sector}",
-        sector_id=start_sector,
-        sector_name="Quarantine Zone",
-        npc_name="Byte",
-        lore="The corporate mainframe is locked down. Recover your coordinates.",
-        dialogue=[
-            "Operative! Welcome back to the grid.",
-            "Type 'pwd' to check sector coordinates, or 'ls -la' to scan for security keys.",
-        ],
-        objectives=[
-            Objective(
-                id="obj_0_1",
-                description="Determine mainframe position with 'pwd'",
-                hint="Type 'pwd'",
-                predicate_type="cwd_equals",
-                predicate_target="/home/operative",
-                xp_reward=50,
-            ),
-            Objective(
-                id="obj_0_2",
-                description="List quarantine contents with 'ls -la'",
-                hint="Type 'ls -la'",
-                predicate_type="file_exists",
-                predicate_target="/home/operative",
-                xp_reward=50,
-            ),
-        ],
-        reward_item=Item(
-            id="item_quarantine_chip",
-            name="Quarantine Keychip",
-            description="Grants clearance to Sector 1 File Vault.",
-            category="hardware",
-            rarity="rare",
-        ),
-        reward_xp=100,
-    )
+    # Initial Sector Quest Setup
+    all_quests = get_sector_quests()
+    quest = all_quests.get(start_sector)
+    if not quest:
+        quest = all_quests[0]
 
     ticker_msg = "SYSTEM ONLINE. Welcome to CyberShell v2.0."
     terminal_logs: list[str] = [
@@ -268,6 +142,7 @@ def interactive_game_loop(character_name: str, start_sector: int) -> None:
         app.hp = player.hp
         app.max_hp = player.max_hp
         app.xp = player.xp
+        app.inventory = player.inventory
 
         # Clear screen and display layout
         sys.stdout.write("\033[H\033[J")
@@ -409,7 +284,7 @@ def interactive_game_loop(character_name: str, start_sector: int) -> None:
 
         # Execute command in VFS
         terminal_logs.append(f"{prompt}{user_input}")
-        result = execute_vfs_command(vfs, user_input)
+        result = interpreter.execute(user_input)
 
         if result.stdout:
             for out_line in result.stdout.splitlines():
@@ -427,25 +302,17 @@ def interactive_game_loop(character_name: str, start_sector: int) -> None:
             ticker_msg = f"Command '{user_input.split()[0]}' executed."
 
         # Objective evaluation
-        curr_obj = quest.current_objective
-        if curr_obj and not curr_obj.completed:
-            if curr_obj.id == "obj_0_1" and user_input.strip() == "pwd":
-                curr_obj.completed = True
-                leveled = player.gain_xp(curr_obj.xp_reward)
-                ticker_msg = f"🎯 OBJECTIVE ACQUIRED: +{curr_obj.xp_reward} XP!"
-                if leveled:
-                    ticker_msg += f" 🌟 LEVEL UP! Rank: {player.rank}"
-
-            elif curr_obj.id == "obj_0_2" and "ls" in user_input.split()[0]:
-                curr_obj.completed = True
-                leveled = player.gain_xp(curr_obj.xp_reward)
-                ticker_msg = f"🎯 OBJECTIVE ACQUIRED: +{curr_obj.xp_reward} XP!"
-                if leveled:
-                    ticker_msg += f" 🌟 LEVEL UP! Rank: {player.rank}"
-
-                if quest.is_completed and quest.reward_item:
-                    player.add_item(quest.reward_item)
-                    ticker_msg += f" 🎁 LOOT ACQUIRED: {quest.reward_item.name}!"
+        old_level = player.level
+        is_completed, newly_completed = evaluator.check_quest_progress(quest, vfs, player)
+        if newly_completed:
+            ticker_msg = f"🎯 {len(newly_completed)} OBJECTIVE(S) ACCOMPLISHED!"
+            if is_completed:
+                ticker_msg += " | QUEST COMPLETE!"
+            if quest.is_completed and quest.reward_item:
+                ticker_msg += f" 🎁 LOOT ACQUIRED: {quest.reward_item.name}!"
+        
+        if player.level > old_level:
+            ticker_msg += f" 🌟 LEVEL UP! Rank: {player.rank}"
 
 
 def main() -> int:
