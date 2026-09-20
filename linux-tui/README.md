@@ -27,13 +27,13 @@ CyberShell v2.0 is developed using the **Strict File Boundary Rule**: each devel
 
 | Developer | Core Role | Assigned Files |
 | :--- | :--- | :--- |
-| **Amy** 👑 | **Project Lead & Master Integrator** | `contracts.py`, `pyproject.toml`, `requirements.txt`, `run.py`, `cybershell_standalone.py`, `tests/test_integration.py`, `tests/conftest.py`, `README.md` |
+| **Amy** . | **Project Lead & Master Integrator** | `contracts.py`, `pyproject.toml`, `requirements.txt`, `run.py`, `cybershell_standalone.py`, `tests/test_integration.py`, `tests/conftest.py`, `README.md` |
 | **Rudra** 💻 | **VFS Architect** | `src/cybershell/engine/node.py`, `src/cybershell/engine/vfs.py`, `tests/test_vfs.py` |
 | **Aniket** ⚡ | **Shell Pipeline & Combat Engine** | `src/cybershell/engine/commands.py`, `src/cybershell/engine/interpreter.py`, `tests/test_interpreter.py` |
 | **Poornendhu** 🖥️ | **Cyber-TUI Lead & Frame Renderer** | `src/cybershell/ui/renderer.py`, `src/cybershell/ui/rpg_app.py`, `tests/test_ui.py` |
 | **Gautham** 🎨 | **ASCII Art, FX & Terminal Input** | `src/cybershell/ui/ascii_art.py`, `src/cybershell/ui/rpg_app.py`, `tests/test_ui.py` |
-| **Neha** 📊 | **Game State & Quest Evaluator** | `src/cybershell/game/state.py`, `src/cybershell/game/evaluator.py`, `tests/test_game.py` |
-| **Aswin** 📜 | **Storyline & 6 Cyber-Sectors** | `src/cybershell/game/quests.py`, `tests/test_game.py` |
+| **Aswin** 📊 | **Game State & Quest Evaluator** | `src/cybershell/game/state.py`, `src/cybershell/game/evaluator.py`, `tests/test_game.py` |
+| **Neha** 📜 | **Storyline & 6 Cyber-Sectors** | `src/cybershell/game/quests.py`, `tests/test_game.py` |
 | **Akash** 🔐 | **Hacker Codex & Chmod Minigame** | `src/cybershell/tools/codex.py`, `src/cybershell/tools/chmod_calc.py`, `src/cybershell/tools/chmod_minigame.py`, `src/cybershell/tools/map.py`, `tests/test_tools.py` |
 
 ---
@@ -133,4 +133,4 @@ uv publish
 
 ---
 ## 📄 License
-MIT License. Created with ❤️ by Amy and the CyberShell Dev Team.
+MIT License. Created with ❤️ by The CyberShell Dev Team.
