@@ -243,8 +243,16 @@ def draw_split_panels(
     left_border = "\033[96m" if styled else ""
     right_border = "\033[92m" if styled else ""
 
-    left = draw_panel(left_title, left_content, left_width, styled=styled, border_color=left_border)
-    right = draw_panel(right_title, right_content, right_width, styled=styled, border_color=right_border)
+    left_items = list(left_content)
+    right_items = list(right_content)
+    target_height = max(len(left_items), len(right_items))
+
+    # Pad inner content so both panels have matching side borders and bottom borders
+    left_items += [""] * (target_height - len(left_items))
+    right_items += [""] * (target_height - len(right_items))
+
+    left = draw_panel(left_title, left_items, left_width, styled=styled, border_color=left_border)
+    right = draw_panel(right_title, right_items, right_width, styled=styled, border_color=right_border)
 
     height = max(len(left), len(right))
 

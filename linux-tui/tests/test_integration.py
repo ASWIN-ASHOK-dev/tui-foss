@@ -534,6 +534,84 @@ class TestCyberShellIntegration(unittest.TestCase):
         self.assertEqual(len(colored), 2)
         self.assertTrue(any("\033[" in line for line in colored))
 
+        # Also test 6-column VFS output
+        raw_vfs = "drwxr-xr-x  1 operative  operative  4096 .\n-rw-r--r--  1 operative  operative  78 firewall.log\n"
+        colored_vfs = colorize_ls_output(raw_vfs)
+        self.assertEqual(len(colored_vfs), 2)
+        self.assertTrue(any("\033[" in line for line in colored_vfs))
+
+    def test_sector_0_step_by_step_no_skip(self) -> None:
+        """Verify that typing pwd only completes Task 1 and does NOT skip Task 2 (1/3 -> 2/3 -> 3/3)."""
+        from cybershell.engine.interpreter import Interpreter
+        from cybershell.game.evaluator import QuestEvaluator
+        from cybershell.game.quests import get_sector_quests
+
+        vfs = VirtualFileSystem(default_user="operative")
+        interpreter = Interpreter(vfs=vfs)
+        evaluator = QuestEvaluator()
+        player = PlayerStats(character_name="Byte", hp=100, max_hp=100, xp=0, current_sector=0)
+        quests = get_sector_quests()
+        quest = quests[0]
+
+        # Initial: Task 1 of 3
+        self.assertEqual(quest.current_objective.id, "obj_0_1")
+
+        # Running a non-matching utility command (e.g. help or ls) must NOT complete Task 1 (pwd)
+        interpreter.execute("help")
+        comp, newly = evaluator.check_quest_progress(quest, vfs, player)
+        self.assertFalse(comp)
+        self.assertEqual(newly, [])
+        self.assertEqual(quest.current_objective.id, "obj_0_1")
+
+        # Step 1: Type 'pwd' -> completes ONLY obj_0_1, advancing to Task 2 (obj_0_2)
+        interpreter.execute("pwd")
+        comp, newly = evaluator.check_quest_progress(quest, vfs, player)
+        self.assertFalse(comp)
+        self.assertEqual(newly, ["obj_0_1"])
+        self.assertEqual(quest.current_objective.id, "obj_0_2")
+        self.assertEqual(quest.current_objective.command, "ls")
+
+        # Running 'pwd' again while on Task 2 must NOT complete Task 2
+        interpreter.execute("pwd")
+        comp, newly = evaluator.check_quest_progress(quest, vfs, player)
+        self.assertFalse(comp)
+        self.assertEqual(newly, [])
+        self.assertEqual(quest.current_objective.id, "obj_0_2")
+
+        # Step 2: Type 'ls -la' -> completes ONLY obj_0_2, advancing to Task 3 (obj_0_3)
+        interpreter.execute("ls -la")
+        comp, newly = evaluator.check_quest_progress(quest, vfs, player)
+        self.assertFalse(comp)
+        self.assertEqual(newly, ["obj_0_2"])
+        self.assertEqual(quest.current_objective.id, "obj_0_3")
+        self.assertEqual(quest.current_objective.command, "touch")
+
+        # Step 3: Type 'touch beacon.log' -> completes obj_0_3 and sector 0
+        interpreter.execute("touch beacon.log")
+        comp, newly = evaluator.check_quest_progress(quest, vfs, player)
+        self.assertTrue(comp)
+        self.assertEqual(newly, ["obj_0_3"])
+        self.assertIsNone(quest.current_objective)
+        self.assertTrue(quest.is_completed)
+        self.assertIn(0, player.completed_sectors)
+
+    def test_split_panels_balanced_borders(self) -> None:
+        """Verify draw_split_panels balances inner content so outer borders align at bottom."""
+        from cybershell.ui.renderer import draw_split_panels
+
+        left_lines = [f"Line {i}" for i in range(20)]
+        right_lines = [f"Log {i}" for i in range(5)]
+
+        rendered = draw_split_panels("LEFT", left_lines, "RIGHT", right_lines, width=80)
+        lines = rendered.splitlines()
+
+        # Both boxes must end on the same line with bottom border characters (╰ and ╯)
+        last_line = lines[-1]
+        self.assertIn("╰", last_line)
+        self.assertIn("╯", last_line)
+        self.assertEqual(last_line.count("╰"), 2)
+        self.assertEqual(last_line.count("╯"), 2)
+
     def test_render_opening_screen_layout(self) -> None:
         """Verify opening screen renders clean description, complete sentences, and station options."""
         from cybershell.run import render_opening_screen

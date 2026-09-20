@@ -43,6 +43,9 @@ class VirtualFileSystem:
         # Set operative home as initial CWD
         self.cd(self.home_dir)
 
+        # Track the last executed shell command for quest evaluation
+        self.last_command: Optional[str] = None
+
     def _init_standard_layout(self) -> None:
         """Create basic Linux directories: /bin, /etc, /home/operative, /root, /tmp, /var, /var/log."""
         for path in [

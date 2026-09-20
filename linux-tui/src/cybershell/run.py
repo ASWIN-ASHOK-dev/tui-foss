@@ -340,18 +340,19 @@ def colorize_ls_output(stdout: str) -> List[str]:
             lines.append("")
             continue
         parts = line.split()
-        if len(parts) >= 9 and len(parts[0]) in (9, 10):
+        if len(parts) >= 6 and len(parts[0]) in (9, 10):
             perms = parts[0]
-            filename = parts[-1]
+            filename = " ".join(parts[5:])
+            prefix_str = " ".join(parts[:5])
             if perms.startswith("d"):
-                parts[-1] = f"{BLUE}{BOLD}{filename}/{RESET}"
+                colored_name = f"{BLUE}{BOLD}{filename}/{RESET}"
             elif "x" in perms:
-                parts[-1] = f"{GREEN}{BOLD}{filename}{RESET}"
+                colored_name = f"{GREEN}{BOLD}{filename}{RESET}"
             elif filename.startswith("."):
-                parts[-1] = f"{DIM}{filename}{RESET}"
+                colored_name = f"{DIM}{filename}{RESET}"
             else:
-                parts[-1] = f"{WHITE}{filename}{RESET}"
-            lines.append(" ".join(parts))
+                colored_name = f"{WHITE}{filename}{RESET}"
+            lines.append(f"{prefix_str} {colored_name}")
         else:
             colored_tokens: List[str] = []
             for token in parts:
@@ -1098,13 +1099,17 @@ def interactive_game_loop(
             boss_bar = format_boss_hp_bar(boss_hp, 100, bar_width=18, styled=True)
             boss_banner = f"{siren}\n{boss_bar.center(width)}\n"
 
+        cwd_short = vfs.get_cwd_path().replace(f"/home/{vfs.user}", "~")
+
         # Split panels with styled borders
-        max_log_lines = max(18, len(intel_lines))
+        max_log_lines = max(16, len(intel_lines) - 2)
+        console_display = list(terminal_logs[-max_log_lines:])
+        console_display.append(f"{GREEN}operative@cybershell:{cwd_short}$ {RESET}\033[7m \033[0m")
         panels = draw_split_panels(
             f"{CYAN}{BOLD}MISSION INTEL & DIRECTIVE{RESET}",
             intel_lines,
             f"{GREEN}{BOLD}ACTIVE TERMINAL CONSOLE{RESET}",
-            terminal_logs[-max_log_lines:],
+            console_display,
             width,
             styled=True,
         )
@@ -1124,7 +1129,6 @@ def interactive_game_loop(
             continue
 
         try:
-            cwd_short = vfs.get_cwd_path().replace(f"/home/{vfs.user}", "~")
             prompt = f"\033[1;92moperative@cybershell\033[0m:\033[1;94m{cwd_short}\033[0m$ "
             user_input = input(prompt).strip()
         except (KeyboardInterrupt, EOFError):
@@ -1305,7 +1309,13 @@ def interactive_game_loop(
 
         # Objective evaluation
         old_level = player.level
-        is_completed, newly_completed = evaluator.check_quest_progress(quest, vfs, player)
+        is_completed, newly_completed = evaluator.check_quest_progress(
+            quest, vfs, player, last_command=user_input
+        )
+        if not result.stderr and result.exit_code == 0 and not newly_completed and not result.stdout:
+            first_cmd = user_input.strip().split()[0] if user_input.strip() else ""
+            if first_cmd in ("touch", "mkdir", "cd", "chmod", "cp", "mv", "rm"):
+                terminal_logs.append(f"{DIM}✓ Command '{first_cmd}' executed successfully.{RESET}")
         if newly_completed:
             hint_tier = 1
             total_reward = 0
