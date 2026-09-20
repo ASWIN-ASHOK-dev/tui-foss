@@ -34,5 +34,7 @@ jobs:
 
       - name: Run Test Suite
         working-directory: ./linux-tui
+        env:
+          PYTHONPATH: src
         run: |
           python -m unittest discover -s tests
