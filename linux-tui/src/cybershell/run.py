@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+from typing import List
 
 # Ensure src/ and project root are on sys.path
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -141,7 +142,7 @@ def interactive_game_loop(character_name: str, start_sector: int) -> None:
         quest = all_quests[0]
 
     ticker_msg = "SYSTEM ONLINE. Welcome to CyberShell v2.0."
-    terminal_logs: list[str] = [
+    terminal_logs: List[str] = [
         "operative@cybershell:~$ System initialized.",
         "operative@cybershell:~$ Type 'help' for available commands.",
     ]

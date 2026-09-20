@@ -3,9 +3,13 @@
 Author: Neha (Narrative & Quests)
 """
 
-from cybershell.contracts import Objective, Quest, Item
+from __future__ import annotations
 
-def get_sector_quests() -> dict[int, Quest]:
+from typing import Dict
+
+from cybershell.contracts import Item, Objective, Quest
+
+def get_sector_quests() -> Dict[int, Quest]:
     """Returns a dictionary mapping sector IDs to their Quests."""
     quests = {}
 
