@@ -247,6 +247,13 @@ class PlayerStats:
         """Check if an item ID exists in inventory."""
         return any(item.id == item_id for item in self.inventory)
 
+    def mark_sector_completed(self, sector_id: int) -> None:
+        """Add sector_id to completed_sectors safely whether backed by list or set."""
+        if isinstance(self.completed_sectors, set):
+            self.completed_sectors.add(sector_id)
+        elif sector_id not in self.completed_sectors:
+            self.completed_sectors.append(sector_id)
+
     def to_dict(self) -> Dict[str, Any]:
         """Serialize player state for local JSON persistence."""
         return {

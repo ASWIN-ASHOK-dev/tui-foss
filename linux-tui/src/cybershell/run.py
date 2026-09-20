@@ -1333,7 +1333,12 @@ def interactive_game_loop(
             save_game(player, cadet_mode)
 
             if is_completed:
-                player.completed_sectors.add(quest.sector_id)
+                if hasattr(player, "mark_sector_completed"):
+                    player.mark_sector_completed(quest.sector_id)
+                elif isinstance(player.completed_sectors, set):
+                    player.completed_sectors.add(quest.sector_id)
+                elif quest.sector_id not in player.completed_sectors:
+                    player.completed_sectors.append(quest.sector_id)
                 terminal_logs.append(f"{MAGENTA}{BOLD}🏆 SECTOR {quest.sector_id} ({quest.sector_name}) FULLY LIBERATED!{RESET}")
                 if quest.reward_item:
                     terminal_logs.append(f"{YELLOW}🎁 LOOT ACQUIRED: {quest.reward_item.name} - {quest.reward_item.description}{RESET}")

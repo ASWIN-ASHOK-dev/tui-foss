@@ -135,7 +135,12 @@ class QuestEvaluator:
                 state.add_item(quest.reward_item)
             
             # Ensure the sector is marked as completed
-            if quest.sector_id not in state.completed_sectors:
-                state.completed_sectors.append(quest.sector_id)
+            if hasattr(state, "mark_sector_completed"):
+                state.mark_sector_completed(quest.sector_id)
+            elif quest.sector_id not in state.completed_sectors:
+                if isinstance(state.completed_sectors, set):
+                    state.completed_sectors.add(quest.sector_id)
+                else:
+                    state.completed_sectors.append(quest.sector_id)
 
         return (quest.completed, newly_completed_ids)
