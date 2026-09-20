@@ -11,7 +11,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
-from typing import List
+from typing import Dict, List, Optional, Tuple
 
 # Ensure src/ and project root are on sys.path
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -40,6 +40,9 @@ from cybershell.game.evaluator import QuestEvaluator
 import textwrap
 
 from cybershell.game.quests import get_sector_quests
+from cybershell.tools.chmod_minigame import ChmodMinigame
+from cybershell.tools.codex import Codex
+from cybershell.tools.map import MainframeMap
 from cybershell.ui.ascii_art import (
     BLUE,
     BOLD,
@@ -52,10 +55,18 @@ from cybershell.ui.ascii_art import (
     WHITE,
     YELLOW,
     format_boss_hp_bar,
+    get_logo,
     get_portrait,
     get_siren_banner,
 )
-from cybershell.ui.renderer import draw_double_header, draw_split_panels, terminal_size
+from cybershell.ui.renderer import (
+    draw_double_header,
+    draw_panel,
+    draw_split_panels,
+    pad_to_width,
+    terminal_size,
+    visual_len,
+)
 from cybershell.ui.rpg_app import RPGApp
 
 
@@ -122,69 +133,398 @@ def run_smoke_test() -> int:
     return 0 if result.wasSuccessful() else 1
 
 
-def run_demo(character_name: str) -> None:
-    """Showcase CyberShell fixed-frame UI rendering across screens."""
-    width, _ = terminal_size()
-    app = RPGApp(character_name=character_name, hp=100, max_hp=100, xp=45)
+# =============================================================================
+# DEDICATED OPENING SCREEN & NAVIGATION
+# =============================================================================
 
-    print("=" * width)
-    print("--- [0] TITLE SCREEN ---".center(width))
-    app.set_screen(RPGApp.SCREEN_TITLE)
-    print(app.render())
+def render_opening_screen(player: PlayerStats, width: int = 80) -> str:
+    """Render the primary opening screen displaying the name, description, and navigation options."""
+    width = max(60, width)
+    inner_w = max(40, width - 4)
 
-    print("\n" + "=" * width)
-    print("--- [1] MISSION LAB SCREEN ---".center(width))
-    app.set_screen(RPGApp.SCREEN_LAB)
-    print(app.render())
+    # 1. ASCII Title Logo & Header
+    logo_raw = get_logo(styled=True)
+    logo_lines = [pad_to_width(line, width, align="center") for line in logo_raw.strip("\n").splitlines()]
 
-    print("\n" + "=" * width)
-    print("--- [2] CODEX SCREEN ---".center(width))
-    app.set_screen(RPGApp.SCREEN_CODEX)
-    print(app.render())
-
-    print("\n" + "=" * width)
-    print("--- [4] MAP SCREEN ---".center(width))
-    app.set_screen(RPGApp.SCREEN_MAP)
-    print(app.render())
-
-
-def interactive_game_loop(character_name: str, start_sector: int) -> None:
-    """Main interactive terminal loop for CyberShell RPG with rich colors and complete sentences."""
-    player = PlayerStats(
-        character_name=character_name,
-        hp=100,
-        max_hp=100,
-        xp=0,
-        current_sector=start_sector,
+    # 2. Operative status line
+    hp_pct = max(0, min(10, int((player.hp / max(1, player.max_hp)) * 10)))
+    hp_bar = f"{GREEN}{'█' * hp_pct}{RED}{'░' * (10 - hp_pct)}{RESET}"
+    status_text = (
+        f"{CYAN}Operative:{RESET} {WHITE}{BOLD}{player.character_name}{RESET}  "
+        f"{YELLOW}Rank:{RESET} {player.rank} (Lvl {player.level})  "
+        f"{RED}HP:{RESET} [{hp_bar}] {player.hp}/{player.max_hp}  "
+        f"{MAGENTA}XP:{RESET} {player.xp}"
     )
-    vfs = VirtualFileSystem(default_user="operative")
-    interpreter = Interpreter(vfs=vfs)
-    evaluator = QuestEvaluator()
-    app = RPGApp(
-        character_name=player.character_name,
-        hp=player.hp,
-        max_hp=player.max_hp,
-        xp=player.xp,
+    status_line = pad_to_width(status_text, width, align="center")
+
+    border_double = f"{CYAN}{'═' * width}{RESET}"
+    border_single = f"{DIM}{'─' * width}{RESET}"
+
+    # 3. Complete Sentences Description of What CyberShell Does
+    about_title = f"{YELLOW}{BOLD}[ WHAT IS CYBERSHELL? ]{RESET}"
+    desc_p1 = (
+        "CyberShell is an interactive terminal-based cyberpunk role-playing game "
+        "designed to help you learn and master real Linux command-line skills, filesystem "
+        "navigation, file inspection, and system security."
     )
+    desc_p2 = (
+        "You play as an elite terminal operative infiltrating a compromised corporate mainframe. "
+        "By executing genuine Linux commands against an in-memory virtual filesystem, you must "
+        "bypass security firewalls, inspect critical data, reconfigure file permissions, "
+        "and liberate core sectors from rogue AI daemons."
+    )
+    desc_p3 = (
+        "Beware: electrical backlash damages your operative (-15 HP) on syntax errors! "
+        "Think tactically, inspect manuals, and hone your terminal command craft."
+    )
+
+    about_lines = [
+        f"  {about_title}",
+        "",
+    ]
+    for p in (desc_p1, desc_p2, desc_p3):
+        for w_line in textwrap.wrap(p, width=inner_w):
+            about_lines.append(f"  {WHITE}{w_line}{RESET}")
+        about_lines.append("")
+
+    # 4. Navigation Options
+    menu_title = f"{GREEN}{BOLD}[ MAIN DIRECTORY // SELECT STATION ]{RESET}"
+    options = [
+        ("1", "Learning Interface", "Interactive Mission Lab campaign & directives"),
+        ("2", "Hacker Codex", "Tactical command reference & decryptions"),
+        ("3", "Operative Inventory", "Inspect hardware tokens, chips, and loot"),
+        ("4", "Tactical Map", "Mainframe sector topology & status map"),
+        ("5", "Security Lockpick", "Chmod octal permission hacking for bonus XP"),
+        ("6", "Field Manual & Rules", "Review combat rules, damage, and controls"),
+        ("0", "Exit CyberShell", "Safely disconnect from terminal session"),
+    ]
+
+    menu_lines = [
+        f"  {menu_title}",
+        "",
+    ]
+    for num, label, summary in options:
+        prefix = f"  {YELLOW}{BOLD}[{num}]{RESET}  {CYAN}{BOLD}{label:<23}{RESET}"
+        menu_lines.append(f"{prefix} {WHITE}{summary}{RESET}")
+
+    all_lines = (
+        logo_lines
+        + ["", status_line, border_double, ""]
+        + about_lines
+        + [border_single, ""]
+        + menu_lines
+        + ["", border_double]
+    )
+    return "\n".join(all_lines)
+
+
+# =============================================================================
+# DEDICATED SCREEN VIEWERS
+# =============================================================================
+
+def view_codex(codex: Codex, player: PlayerStats, width: int) -> None:
+    """Display the Hacker Codex tactical command archive."""
+    while True:
+        sys.stdout.write("\033[H\033[J")
+        header = draw_double_header(
+            player.character_name,
+            player.hp,
+            player.max_hp,
+            player.xp,
+            "HACKER CODEX // TACTICAL ARCHIVE",
+            width,
+            styled=True,
+        )
+        print(header)
+        print()
+        print(f"  {YELLOW}{BOLD}[ HACKER CODEX // TACTICAL COMMAND ARCHIVE ]{RESET}")
+        desc = (
+            "The Hacker Codex is your tactical archive of essential Linux commands and system tools. "
+            "Enter any command name below to decrypt its full manual entry, syntax flags, and operational examples."
+        )
+        for line in textwrap.wrap(desc, width=width - 4):
+            print(f"  {WHITE}{line}{RESET}")
+        print()
+        print(f"  {CYAN}{BOLD}AVAILABLE COMMANDS:{RESET}")
+        cmds = [entry["name"] for entry in codex.list_commands()]
+        chunk_size = 4
+        for i in range(0, len(cmds), chunk_size):
+            chunk = cmds[i : i + chunk_size]
+            formatted = "    ".join(f"{GREEN}{cmd:<8}{RESET}" for cmd in chunk)
+            print(f"    {formatted}")
+        print()
+        print(f"  {DIM}{'─' * (width - 4)}{RESET}")
+        try:
+            term = input(
+                f"  {YELLOW}Enter command to decrypt (or press Enter / '0' to return to menu): {RESET}"
+            ).strip()
+        except (KeyboardInterrupt, EOFError):
+            break
+
+        if not term or term in ("0", "q", "quit", "exit", "back", "menu"):
+            break
+
+        entry_text = codex.display_command(term)
+        print()
+        print(f"  {MAGENTA}{BOLD}=== DECRYPTION RESULT: {term.upper()} ==={RESET}")
+        for e_line in entry_text.splitlines():
+            print(f"  {WHITE}{e_line}{RESET}")
+        try:
+            input(f"\n  {YELLOW}Press Enter to return to command list...{RESET}")
+        except (KeyboardInterrupt, EOFError):
+            break
+
+
+def view_inventory(player: PlayerStats, width: int) -> None:
+    """Display the Operative Inventory and hardware tokens."""
+    sys.stdout.write("\033[H\033[J")
+    header = draw_double_header(
+        player.character_name,
+        player.hp,
+        player.max_hp,
+        player.xp,
+        "OPERATIVE INVENTORY & LOOT",
+        width,
+        styled=True,
+    )
+    print(header)
+    print()
+    print(f"  {YELLOW}{BOLD}[ OPERATIVE HARDWARE TOKENS & CHIPS ]{RESET}")
+    desc = (
+        "Hardware tokens, cryptographic exploits, and system chips acquired by liberating mainframe sectors. "
+        "These artifacts prove your security clearance across the network."
+    )
+    for line in textwrap.wrap(desc, width=width - 4):
+        print(f"  {WHITE}{line}{RESET}")
+    print()
+    if not player.inventory:
+        print(f"  {DIM}Your inventory is currently empty.{RESET}")
+        print(f"  {CYAN}Complete sector objectives in the Learning Interface to earn loot items!{RESET}")
+    else:
+        for idx, itm in enumerate(player.inventory, start=1):
+            rarity_col = MAGENTA if itm.rarity in ("epic", "legendary", "mythic") else GREEN
+            print(f"  [{idx}] 🎁 {WHITE}{BOLD}{itm.name}{RESET} [{rarity_col}{itm.rarity.upper()}{RESET}] ({itm.category.upper()})")
+            print(f"       {CYAN}{itm.description}{RESET}")
+            print()
+    print(f"  {DIM}{'─' * (width - 4)}{RESET}")
+    try:
+        input(f"  {YELLOW}Press Enter to return to Main Menu...{RESET}")
+    except (KeyboardInterrupt, EOFError):
+        pass
+
+
+def view_map(mainframe: MainframeMap, player: PlayerStats, all_quests: Dict[int, Quest], width: int) -> None:
+    """Display the Tactical Mainframe Map and sector progression status."""
+    sys.stdout.write("\033[H\033[J")
+    mainframe.apply_progression(player)
+    header = draw_double_header(
+        player.character_name,
+        player.hp,
+        player.max_hp,
+        player.xp,
+        "TACTICAL MAINFRAME NETWORK MAP",
+        width,
+        styled=True,
+    )
+    print(header)
+    print()
+    print(f"  {YELLOW}{BOLD}[ MAINFRAME NETWORK TOPOLOGY ]{RESET}")
+    desc = (
+        "The network map charts the 6 key sectors of the corporate mainframe. "
+        "Infiltrate each sector sequentially in the Learning Interface to purge rogue daemons."
+    )
+    for line in textwrap.wrap(desc, width=width - 4):
+        print(f"  {WHITE}{line}{RESET}")
+    print()
+    for m_line in mainframe.render().splitlines():
+        print(f"  {m_line}")
+    print()
+    print(f"  {YELLOW}{BOLD}SECTOR TELEMETRY STATUS:{RESET}")
+    for sid in range(6):
+        q_info = all_quests.get(sid)
+        sec_name = q_info.sector_name if q_info else f"Sector {sid}"
+        if sid == player.current_sector:
+            status_str = f"{GREEN}🟢 CURRENT TARGET (ACTIVE INFILTRATION){RESET}"
+        elif sid in player.completed_sectors:
+            status_str = f"{BLUE}🔵 LIBERATED (PERIMETER SECURED){RESET}"
+        else:
+            status_str = f"{RED}🔒 LOCKED (DEFENSIVE SHIELDS ENGAGED){RESET}"
+        print(f"    [{sid}] {WHITE}{sec_name:<24}{RESET} Status: {status_str}")
+    print()
+    print(f"  {DIM}{'─' * (width - 4)}{RESET}")
+    try:
+        input(f"  {YELLOW}Press Enter to return to Main Menu...{RESET}")
+    except (KeyboardInterrupt, EOFError):
+        pass
+
+
+def view_minigame(minigame: ChmodMinigame, player: PlayerStats, width: int) -> None:
+    """Run the interactive Chmod Lockpicking Minigame for bonus XP."""
+    minigame.set_player(player)
+    while True:
+        sys.stdout.write("\033[H\033[J")
+        header = draw_double_header(
+            player.character_name,
+            player.hp,
+            player.max_hp,
+            player.xp,
+            "SECURITY LOCKPICK // CHMOD PUZZLE",
+            width,
+            styled=True,
+        )
+        print(header)
+        print()
+        print(f"  {YELLOW}{BOLD}[ CHMOD PERMISSION LOCKPICK CHALLENGE ]{RESET}")
+        desc = (
+            "Security doors on the corporate mainframe are sealed with Unix permission locks. "
+            "Convert the 9-character permission string into its 3-digit octal notation (e.g., rwxr-xr-x = 755) "
+            "to breach the door and extract bonus operative XP."
+        )
+        for line in textwrap.wrap(desc, width=width - 4):
+            print(f"  {WHITE}{line}{RESET}")
+        print()
+        puzzle = minigame.generate_puzzle()
+        door_lines = minigame.render_door().splitlines()
+        for d_line in door_lines:
+            print(f"  {d_line}")
+        print()
+        try:
+            guess = input(
+                f"  {YELLOW}Enter 3-digit octal code for '{puzzle.permission}' (or 'q' to return to menu): {RESET}"
+            ).strip()
+        except (KeyboardInterrupt, EOFError):
+            break
+
+        if not guess or guess.lower() in ("q", "quit", "0", "exit", "back", "menu"):
+            break
+
+        result = minigame.validate_answer(guess)
+        if result.correct:
+            print(f"\n  {GREEN}{BOLD}{result.message}{RESET}")
+            if result.xp_awarded > 0:
+                print(f"  {GREEN}🎉 +{result.xp_awarded} XP awarded to {player.character_name}! Current XP: {player.xp}{RESET}")
+            try:
+                input(f"\n  {YELLOW}Press Enter for next security door...{RESET}")
+            except (KeyboardInterrupt, EOFError):
+                break
+        else:
+            print(f"\n  {RED}{BOLD}{result.message}{RESET}")
+            try:
+                input(f"\n  {YELLOW}Press Enter to try another lock...{RESET}")
+            except (KeyboardInterrupt, EOFError):
+                break
+
+
+def view_field_manual(width: int) -> None:
+    """Display the Field Manual, combat rules, and command guide."""
+    sys.stdout.write("\033[H\033[J")
+    header = draw_double_header(
+        "OPERATIVE",
+        100,
+        100,
+        0,
+        "FIELD MANUAL & RULES",
+        width,
+        styled=True,
+    )
+    print(header)
+    print()
+    sections = [
+        ("OPERATIONAL OVERVIEW", [
+            "CyberShell RPG v2.0 is an interactive terminal learning adventure.",
+            "Your objective is to navigate 6 compromised mainframe sectors, complete hands-on terminal directives, and liberate core subsystems from rogue security daemons.",
+        ]),
+        ("ELECTRICAL BACKLASH DAMAGE (-15 HP)", [
+            "Executing invalid commands or typos sends electrical shock through your terminal connection (-15 HP).",
+            "If your HP drops to 0, your connection crashes and reboots in safe mode. Think before pressing Enter!",
+            "Requesting objective hints incurs a minor penalty of -5 HP.",
+        ]),
+        ("ESSENTIAL LINUX COMMANDS", [
+            "pwd            - Print working directory coordinates.",
+            "ls, ls -la     - List files, directories, hidden assets, and permissions.",
+            "cd <path>      - Navigate directory tree (use '..', '~', or absolute paths).",
+            "cat <file>     - Read and inspect text or log files.",
+            "touch <file>   - Create new empty files.",
+            "mkdir <dir>    - Create new directory folders.",
+            "chmod <mode>   - Modify file permissions using octal notation (e.g., 755).",
+            "grep <pattern> - Search files for matching text patterns.",
+            "Pipes (|)      - Chain command outputs into inputs (e.g., cat file | grep text).",
+        ]),
+        ("STATION NAVIGATION & SHORTCUTS", [
+            "From the Learning Interface terminal console, you can jump between stations:",
+            "  menu (or 0)  - Return to Main Opening Menu.",
+            "  codex (or 2) - Open Hacker Codex tactical spellbook.",
+            "  items (or 3) - View inventory and collected hardware tokens.",
+            "  map (or 4)   - Open Tactical Map of mainframe sectors.",
+            "  minigame     - Play the Chmod Lockpicking challenge.",
+            "  help         - Display operative command manual.",
+        ]),
+    ]
+    for sec_title, sec_lines in sections:
+        print(f"  {YELLOW}{BOLD}[ {sec_title} ]{RESET}")
+        for line in sec_lines:
+            for w in textwrap.wrap(line, width=width - 6):
+                print(f"    {WHITE}{w}{RESET}")
+        print()
+    print(f"  {DIM}{'─' * (width - 4)}{RESET}")
+    try:
+        input(f"  {YELLOW}Press Enter to return to Main Menu...{RESET}")
+    except (KeyboardInterrupt, EOFError):
+        pass
+
+
+def interactive_game_loop(
+    character_name: str = "Byte",
+    start_sector: int = 0,
+    player: Optional[PlayerStats] = None,
+    vfs: Optional[VirtualFileSystem] = None,
+    interpreter: Optional[Interpreter] = None,
+    evaluator: Optional[QuestEvaluator] = None,
+    all_quests: Optional[Dict[int, Quest]] = None,
+    app: Optional[RPGApp] = None,
+) -> None:
+    """Interactive Learning Interface game loop with split panels, narrative intel, and terminal console."""
+    if player is None:
+        player = PlayerStats(
+            character_name=character_name,
+            hp=100,
+            max_hp=100,
+            xp=0,
+            current_sector=start_sector,
+        )
+    if vfs is None:
+        vfs = VirtualFileSystem(default_user="operative")
+    if interpreter is None:
+        interpreter = Interpreter(vfs=vfs)
+    if evaluator is None:
+        evaluator = QuestEvaluator()
+    if all_quests is None:
+        all_quests = get_sector_quests()
+    if app is None:
+        app = RPGApp(
+            character_name=player.character_name,
+            hp=player.hp,
+            max_hp=player.max_hp,
+            xp=player.xp,
+        )
+
     app.set_screen(RPGApp.SCREEN_LAB)
 
-    # Initial Sector Quest Setup
-    all_quests = get_sector_quests()
-    quest = all_quests.get(start_sector)
+    quest = all_quests.get(player.current_sector)
     if not quest:
         quest = all_quests[0]
 
-    ticker_msg = "CYBERSHELL v2.0 ONLINE // Security Breach Protocols Activated"
+    ticker_msg = "LEARNING INTERFACE // Mission Directives Active"
     init_w, _ = terminal_size()
     panel_content_w = max(20, ((init_w - 2) // 2) - 6)
     banner_bar = "═" * panel_content_w
     terminal_logs: List[str] = [
         f"{GREEN}╔{banner_bar}╗{RESET}",
-        f"{GREEN}║{f'CYBERSHELL v{__version__} SHELL':^{panel_content_w}}║{RESET}",
+        f"{GREEN}║{f'CYBERSHELL v{__version__} MISSION LAB':^{panel_content_w}}║{RESET}",
         f"{GREEN}╚{banner_bar}╝{RESET}",
-        f"{CYAN}Operative '{player.character_name}' online in Sector 0.{RESET}",
-        f"{YELLOW}Warning: Typos cause -15 HP backlash!{RESET}",
-        f"{WHITE}Type 'help' for full guide or 'codex' for tactics.{RESET}",
+        f"{CYAN}Operative '{player.character_name}' link established in Sector {player.current_sector}.{RESET}",
+        f"{YELLOW}Warning: Typos and syntax errors cause -15 HP backlash!{RESET}",
+        f"{WHITE}Type 'help' for commands, or 'menu' (or '0') to return to Main Menu.{RESET}",
         f"{DIM}{'─' * (panel_content_w + 2)}{RESET}",
     ]
 
@@ -261,9 +601,8 @@ def interactive_game_loop(character_name: str, start_sector: int) -> None:
         intel_lines.append("")
 
         # 6. Shortcuts
-        intel_lines.append(f"{DIM}Shortcuts: [help] [codex]{RESET}")
-        intel_lines.append(f"{DIM}           [map] [items]{RESET}")
-        intel_lines.append(f"{DIM}           [minigame] [exit]{RESET}")
+        intel_lines.append(f"{DIM}Shortcuts: [menu] [help] [codex]{RESET}")
+        intel_lines.append(f"{DIM}           [map]  [items] [minigame]{RESET}")
 
         # Boss HUD if in Sector 5
         boss_banner = ""
@@ -292,7 +631,10 @@ def interactive_game_loop(character_name: str, start_sector: int) -> None:
             print("\n" + f"{RED}{BOLD}💀 SYSTEM CRITICAL: ELECTRICAL BACKLASH OVERLOAD. OPERATIVE TERMINATED. 💀{RESET}".center(width + 15))
             print(f"{YELLOW}Rebooting operative mainframe link in sandbox safe mode...{RESET}\n")
             player.hp = 100
-            input("Press Enter to reboot operative...")
+            try:
+                input("Press Enter to reboot operative...")
+            except (KeyboardInterrupt, EOFError):
+                break
             continue
 
         try:
@@ -300,110 +642,35 @@ def interactive_game_loop(character_name: str, start_sector: int) -> None:
             prompt = f"\033[1;92moperative@cybershell\033[0m:\033[1;94m{cwd_short}\033[0m$ "
             user_input = input(prompt).strip()
         except (KeyboardInterrupt, EOFError):
-            print(f"\n{CYAN}Disconnecting from CyberShell session. Safe travels, operative.{RESET}")
+            print(f"\n{CYAN}Returning to CyberShell Main Menu...{RESET}")
             break
 
         if not user_input:
             continue
 
-        # Screen routing commands
-        if user_input in ("0", "title"):
-            app.set_screen(RPGApp.SCREEN_TITLE)
-            print(app.render())
-            input(f"\n{YELLOW}Press Enter to return to Mission Lab...{RESET}")
-            app.set_screen(RPGApp.SCREEN_LAB)
-            continue
+        # Return to main menu
+        if user_input.lower() in ("0", "menu", "main", "back", "title"):
+            break
 
+        if user_input.lower() in ("exit", "quit"):
+            break
+
+        # In-game station viewers
         if user_input in ("2", "codex"):
-            app.set_screen(RPGApp.SCREEN_CODEX)
-            print("\n" + "=" * width)
-            print(f"{MAGENTA}{BOLD}--- HACKER CODEX // TACTICAL COMMAND ARCHIVE ---{RESET}".center(width + 15))
-            print(app.render())
-            term = input(
-                f"\n{YELLOW}Enter a command name to decrypt (or press Enter to return): {RESET}"
-            ).strip()
-            if term:
-                print(app.codex.display_command(term))
-                input(f"\n{YELLOW}Press Enter to return to Mission Lab...{RESET}")
-            app.set_screen(RPGApp.SCREEN_LAB)
+            view_codex(app.codex, player, width)
             continue
 
         if user_input in ("3", "items", "inventory"):
-            print("\n" + "=" * width)
-            print(f"{CYAN}{BOLD}--- OPERATIVE INVENTORY & HARDWARE TOKENS ---{RESET}".center(width + 15))
-            if not player.inventory:
-                print(f"\n  {DIM}Your inventory is currently empty. Complete sector objectives to earn loot!{RESET}\n")
-            else:
-                print()
-                for itm in player.inventory:
-                    rarity_col = MAGENTA if itm.rarity in ("epic", "legendary", "mythic") else GREEN
-                    print(f"  🎁 {WHITE}{BOLD}{itm.name}{RESET} [{rarity_col}{itm.rarity.upper()}{RESET}] ({itm.category.upper()})")
-                    print(f"     {CYAN}{itm.description}{RESET}\n")
-            input(f"\n{YELLOW}Press Enter to return to Mission Lab...{RESET}")
+            view_inventory(player, width)
             continue
 
         if user_input in ("4", "map"):
-            app.set_screen(RPGApp.SCREEN_MAP)
-            app.mainframe.apply_progression(player)
-            print("\n" + "=" * width)
-            print(f"{CYAN}{BOLD}--- TACTICAL MAINFRAME NETWORK MAP ---{RESET}".center(width + 15))
-            print(app.render())
-            print(f"\n{YELLOW}{BOLD}SECTOR NETWORK TELEMETRY:{RESET}")
-            for sid in range(6):
-                q_info = all_quests.get(sid)
-                if sid == player.current_sector:
-                    status_str = f"{GREEN}🟢 CURRENT TARGET (ACTIVE INFILTRATION){RESET}"
-                elif sid in player.completed_sectors:
-                    status_str = f"{BLUE}🔵 LIBERATED (PERIMETER SECURED){RESET}"
-                else:
-                    status_str = f"{RED}🔒 LOCKED (DEFENSIVE SHIELDS ENGAGED){RESET}"
-                print(f"  [{sid}] {WHITE}{q_info.sector_name:<20}{RESET} Status: {status_str}")
-            input(f"\n{YELLOW}Press Enter to return to Mission Lab...{RESET}")
-            app.set_screen(RPGApp.SCREEN_LAB)
+            view_map(app.mainframe, player, all_quests, width)
             continue
 
         if user_input in ("5", "minigame"):
-            app.minigame.set_player(player)
-            app.set_screen(RPGApp.SCREEN_MINIGAME)
-            breach_session = True
-            while breach_session:
-                puzzle = app.minigame.generate_puzzle()
-                app.xp = player.xp
-                print(app.render())
-                while True:
-                    try:
-                        guess = input(
-                            f"\n{YELLOW}Enter octal code for pattern '{puzzle.permission}' "
-                            f"(or 'q' to return): {RESET}"
-                        ).strip()
-                    except (KeyboardInterrupt, EOFError):
-                        guess = "q"
-                    if not guess:
-                        continue
-                    if guess.lower() in ("q", "quit", "back", "exit"):
-                        breach_session = False
-                        break
-                    result = app.minigame.validate_answer(guess)
-                    if result.correct:
-                        print(f"\n{GREEN}{BOLD}{result.message}{RESET}")
-                        if result.xp_awarded > 0:
-                            ticker_msg = (
-                                f"🔓 DOOR #{puzzle.door_number:02d} BREACHED: "
-                                f"+{result.xp_awarded} XP"
-                            )
-                            print(f"{GREEN}🎉 +{result.xp_awarded} XP granted to operative!{RESET}")
-                        else:
-                            ticker_msg = f"🔓 DOOR #{puzzle.door_number:02d} already breached."
-                        input(f"\n{YELLOW}Press Enter for next security door...{RESET}")
-                        break
-                    print(f"\n{RED}{result.message}{RESET}")
-            app.xp = player.xp
-            app.set_screen(RPGApp.SCREEN_LAB)
+            view_minigame(app.minigame, player, width)
             continue
-
-        if user_input.lower() in ("exit", "quit"):
-            print(f"\n{CYAN}Disconnecting from CyberShell mainframe. Safe travels, operative.{RESET}")
-            break
 
         if user_input == "clear":
             terminal_logs = [f"{DIM}(terminal console cleared){RESET}"]
@@ -421,11 +688,11 @@ def interactive_game_loop(character_name: str, start_sector: int) -> None:
             terminal_logs.append(f"  {WHITE}chmod <mode>{RESET}   : Modify file permissions using octal notation (e.g. 755).")
             terminal_logs.append(f"  {WHITE}clear{RESET}          : Clear previous log entries from the terminal screen.")
             terminal_logs.append(f"{CYAN}{BOLD}--- TACTICAL SHORTCUTS ---{RESET}")
+            terminal_logs.append(f"  {WHITE}menu (or 0){RESET}    : Return to the Main Opening Menu.")
             terminal_logs.append(f"  {WHITE}codex (or 2){RESET}   : Open the Hacker Codex tactical spellbook.")
             terminal_logs.append(f"  {WHITE}map (or 4){RESET}     : View the ASCII network map of all sectors.")
             terminal_logs.append(f"  {WHITE}items (or 3){RESET}   : View collected loot and hardware chips.")
             terminal_logs.append(f"  {WHITE}minigame (or 5){RESET}: Play the Chmod Lockpicking puzzle for bonus XP.")
-            terminal_logs.append(f"  {WHITE}exit (or quit){RESET} : Safely terminate the connection.")
             ticker_msg = "COMMAND MANUAL DISPLAYED // Review available commands above."
             continue
 
@@ -454,9 +721,18 @@ def interactive_game_loop(character_name: str, start_sector: int) -> None:
         old_level = player.level
         is_completed, newly_completed = evaluator.check_quest_progress(quest, vfs, player)
         if newly_completed:
-            for obj in newly_completed:
-                terminal_logs.append(f"{GREEN}{BOLD}🎯 DIRECTIVE ACCOMPLISHED! +{obj.xp_reward} XP: {obj.description}{RESET}")
-            ticker_msg = f"🎯 OBJECTIVE ACCOMPLISHED! +{sum(o.xp_reward for o in newly_completed)} XP"
+            total_reward = 0
+            for item in newly_completed:
+                if isinstance(item, str):
+                    matched_obj = next((o for o in quest.objectives if o.id == item), None)
+                    desc = matched_obj.description if matched_obj else item
+                    reward = matched_obj.xp_reward if matched_obj else 50
+                else:
+                    desc = item.description
+                    reward = item.xp_reward
+                total_reward += reward
+                terminal_logs.append(f"{GREEN}{BOLD}🎯 DIRECTIVE ACCOMPLISHED! +{reward} XP: {desc}{RESET}")
+            ticker_msg = f"🎯 OBJECTIVE ACCOMPLISHED! +{total_reward} XP"
             if is_completed:
                 terminal_logs.append(f"{MAGENTA}{BOLD}🏆 SECTOR {quest.sector_id} ({quest.sector_name}) FULLY LIBERATED!{RESET}")
                 if quest.reward_item:
@@ -480,6 +756,103 @@ def interactive_game_loop(character_name: str, start_sector: int) -> None:
             ticker_msg += f" 🌟 LEVEL UP! Rank: {player.rank}"
 
 
+# =============================================================================
+# MAIN MENU CONTROLLER LOOP
+# =============================================================================
+
+def main_menu_loop(character_name: str = "Byte", start_sector: int = 0) -> None:
+    """Main menu loop presenting the opening screen and navigation options."""
+    player = PlayerStats(
+        character_name=character_name,
+        hp=100,
+        max_hp=100,
+        xp=0,
+        current_sector=start_sector,
+    )
+    vfs = VirtualFileSystem(default_user="operative")
+    interpreter = Interpreter(vfs=vfs)
+    evaluator = QuestEvaluator()
+    all_quests = get_sector_quests()
+
+    app = RPGApp(
+        character_name=player.character_name,
+        hp=player.hp,
+        max_hp=player.max_hp,
+        xp=player.xp,
+    )
+
+    while True:
+        width, _ = terminal_size()
+        sys.stdout.write("\033[H\033[J")
+        print(render_opening_screen(player, width))
+
+        try:
+            choice = input(f"\n{YELLOW}Select station [0-6] (default: 1): {RESET}").strip()
+        except (KeyboardInterrupt, EOFError):
+            print(f"\n{CYAN}Disconnecting from CyberShell session. Safe travels, operative.{RESET}\n")
+            break
+
+        if not choice:
+            choice = "1"
+
+        choice_lower = choice.lower()
+        if choice_lower in ("0", "exit", "quit", "q"):
+            print(f"\n{CYAN}Disconnecting from CyberShell mainframe session. Safe travels, operative.{RESET}\n")
+            break
+        elif choice_lower in ("1", "lab", "learn", "learning"):
+            interactive_game_loop(
+                character_name=player.character_name,
+                start_sector=player.current_sector,
+                player=player,
+                vfs=vfs,
+                interpreter=interpreter,
+                evaluator=evaluator,
+                all_quests=all_quests,
+                app=app,
+            )
+        elif choice_lower in ("2", "codex"):
+            view_codex(app.codex, player, width)
+        elif choice_lower in ("3", "items", "inventory"):
+            view_inventory(player, width)
+        elif choice_lower in ("4", "map"):
+            view_map(app.mainframe, player, all_quests, width)
+        elif choice_lower in ("5", "minigame", "lockpick"):
+            view_minigame(app.minigame, player, width)
+        elif choice_lower in ("6", "manual", "help", "rules"):
+            view_field_manual(width)
+        else:
+            print(f"\n{RED}Unrecognized station option '{choice}'. Please select [0-6].{RESET}")
+            try:
+                input(f"{YELLOW}Press Enter to continue...{RESET}")
+            except (KeyboardInterrupt, EOFError):
+                break
+
+
+def run_demo(character_name: str = "Byte") -> None:
+    """Showcase CyberShell fixed-frame UI rendering across screens without dumping all at once."""
+    width, _ = terminal_size()
+    app = RPGApp(character_name=character_name, hp=100, max_hp=100, xp=45)
+    player = PlayerStats(character_name=character_name, hp=100, max_hp=100, xp=45)
+
+    screens = [
+        ("TITLE & OPENING SCREEN", lambda: render_opening_screen(player, width)),
+        ("MISSION LAB SCREEN", lambda: app.render_lab(width)),
+        ("HACKER CODEX SCREEN", lambda: app.render_codex(width)),
+        ("TACTICAL MAP SCREEN", lambda: app.render_map(width)),
+    ]
+
+    for title, render_fn in screens:
+        sys.stdout.write("\033[H\033[J")
+        print("=" * width)
+        print(f"--- {title} ---".center(width))
+        print(render_fn())
+        if sys.stdin.isatty():
+            try:
+                input(f"\n{YELLOW}Press Enter to view next screen (or Ctrl+C to exit demo)...{RESET}")
+            except (KeyboardInterrupt, EOFError):
+                break
+
+
 def main() -> int:
     """Main program entrypoint."""
     args = parse_args()
@@ -491,7 +864,7 @@ def main() -> int:
         run_demo(args.name)
         return 0
 
-    interactive_game_loop(args.name, args.sector)
+    main_menu_loop(args.name, args.sector)
     return 0
 
 
