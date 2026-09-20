@@ -3,6 +3,8 @@
 Author: Aswin (Game State, Progression & Evaluator)
 """
 
+from __future__ import annotations
+
 import json
 import os
 from pathlib import Path

@@ -3,6 +3,8 @@
 Author: Aswin (Game State, Progression & Evaluator)
 """
 
+from __future__ import annotations
+
 from typing import Any, List, Tuple
 
 from cybershell.contracts import Objective, PlayerStats, Quest
