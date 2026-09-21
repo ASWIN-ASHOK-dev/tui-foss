@@ -35,6 +35,10 @@ class ShellCommands:
             "chmod": self.chmod,
             "grep": self.grep,
             "wc": self.wc,
+            "find": self.find,
+            "man": self.man,
+            "lookup": self.lookup,
+            "help": self.help,
         }
 
     @property
@@ -286,3 +290,89 @@ class ShellCommands:
         if isinstance(content, CommandResult):
             return content
         return CommandResult(stdout=f"{content.count(chr(10))}\n")
+
+    def find(self, args: Sequence[str], stdin: str = "") -> CommandResult:
+        import fnmatch
+        import posixpath
+        start_path = "."
+        name_pattern = "*"
+        type_filter = None
+
+        idx = 0
+        if args and not args[0].startswith("-"):
+            start_path = args[0]
+            idx = 1
+
+        while idx < len(args):
+            arg = args[idx]
+            if arg == "-name" and idx + 1 < len(args):
+                name_pattern = args[idx + 1].strip("'\"")
+                idx += 2
+            elif arg == "-type" and idx + 1 < len(args):
+                type_filter = args[idx + 1].lower()
+                idx += 2
+            else:
+                idx += 1
+
+        try:
+            start_node = self.vfs.resolve_path(start_path)
+        except Exception:
+            return CommandResult(stderr=f"find: '{start_path}': No such file or directory\n", exit_code=1)
+
+        results: List[str] = []
+
+        def _traverse(node: FSNode, current_display: str) -> None:
+            matches_name = fnmatch.fnmatch(node.name, name_pattern) or (name_pattern == "*" and not node.name)
+            matches_type = True
+            if type_filter == "f":
+                matches_type = not node.is_directory
+            elif type_filter == "d":
+                matches_type = node.is_directory
+
+            if matches_name and matches_type and current_display:
+                results.append(current_display)
+
+            if isinstance(node, DirectoryNode):
+                for child_name, child in sorted(node.children.items()):
+                    child_display = posixpath.join(current_display, child_name) if current_display != "/" else f"/{child_name}"
+                    _traverse(child, child_display)
+
+        base_display = start_path if start_path != "." else "."
+        _traverse(start_node, base_display)
+
+        output = "\n".join(results) + ("\n" if results else "")
+        return CommandResult(stdout=output, exit_code=0)
+
+    def man(self, args: Sequence[str], stdin: str = "") -> CommandResult:
+        if not args:
+            return CommandResult(
+                stdout="What manual page do you want?\nFor example, try 'man ls', 'man grep', or 'man find'.\n",
+                exit_code=0,
+            )
+        from cybershell.tools.codex import format_man_page
+        text = format_man_page(args[0])
+        return CommandResult(stdout=text + "\n", exit_code=0)
+
+    def lookup(self, args: Sequence[str], stdin: str = "") -> CommandResult:
+        return self.man(args, stdin)
+
+    def help(self, args: Sequence[str], stdin: str = "") -> CommandResult:
+        if args:
+            return self.man(args, stdin)
+        commands = sorted(self._commands.keys())
+        lines = [
+            "CYBERSHELL TACTICAL COMMAND SUITE",
+            "Core filesystem tools:",
+            f"  {', '.join(commands[:10])}",
+            f"  {', '.join(commands[10:])}",
+            "",
+            "Command Learning System:",
+            "  man <cmd>     - Concise beginner-friendly manual page (e.g. 'man ls')",
+            "  lookup <cmd>  - Syntax & flag lookup (alias for man)",
+            "  hint          - Request progressive clues for the current objective",
+            "  status        - View operative stats, streak, score, and badges",
+            "  clear         - Wipe terminal stream",
+            "",
+            "Experiment freely! Typos and unknown commands do not damage your system.",
+        ]
+        return CommandResult(stdout="\n".join(lines) + "\n", exit_code=0)

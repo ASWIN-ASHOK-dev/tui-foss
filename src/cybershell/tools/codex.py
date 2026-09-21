@@ -175,6 +175,179 @@ COMMANDS: Dict[str, Dict[str, Any]] = {
             "mkdir -p /tmp/ops → cd /tmp/ops → touch log.txt   # stage an operation node",
         ],
     },
+    "pwd": {
+        "name": "pwd",
+        "description": "Print working directory - output current path coordinates.",
+        "syntax": "pwd",
+        "flags": {},
+        "examples": [
+            "pwd",
+        ],
+        "combos": [
+            "pwd → cd ..   # check coordinates before navigating",
+        ],
+    },
+    "find": {
+        "name": "find",
+        "description": "Search for files and directories in a directory hierarchy.",
+        "syntax": "find [path] [expression]",
+        "flags": {
+            "-name": "Match files by name pattern (e.g. -name '*.txt')",
+            "-type": "Filter by type: 'f' for file, 'd' for directory",
+        },
+        "examples": [
+            "find . -name '*.txt'",
+            "find /home -type f",
+        ],
+        "combos": [
+            "find . -name '*.log' → cat   # locate files, then inspect them",
+        ],
+    },
+    "cp": {
+        "name": "cp",
+        "description": "Copy files or directories to a new destination.",
+        "syntax": "cp [options] <source> <dest>",
+        "flags": {
+            "-r": "Copy directories recursively",
+        },
+        "examples": [
+            "cp intel.txt intel.bak",
+            "cp -r /source /dest",
+        ],
+        "combos": [
+            "cp file.txt backup/   # create a safe duplicate before modifying",
+        ],
+    },
+    "mv": {
+        "name": "mv",
+        "description": "Move or rename files and directories.",
+        "syntax": "mv <source> <dest>",
+        "flags": {},
+        "examples": [
+            "mv old.txt new.txt",
+            "mv file.txt /tmp/",
+        ],
+        "combos": [
+            "mv data.log archive/   # relocate files",
+        ],
+    },
+    "head": {
+        "name": "head",
+        "description": "Output the first part of files or streams.",
+        "syntax": "head [-n count] [file...]",
+        "flags": {
+            "-n": "Number of lines to show (default: 10)",
+        },
+        "examples": [
+            "head data.log",
+            "head -n 5 traffic.txt",
+        ],
+        "combos": [
+            "cat log.txt | head -n 10",
+        ],
+    },
+    "tail": {
+        "name": "tail",
+        "description": "Output the last part of files or streams.",
+        "syntax": "tail [-n count] [file...]",
+        "flags": {
+            "-n": "Number of lines to show (default: 10)",
+        },
+        "examples": [
+            "tail system.log",
+            "tail -n 20 events.log",
+        ],
+        "combos": [
+            "cat stream.log | tail -n 5",
+        ],
+    },
+    "wc": {
+        "name": "wc",
+        "description": "Print newline, word, and byte counts for files or streams.",
+        "syntax": "wc [-l] [file...]",
+        "flags": {
+            "-l": "Count lines only",
+            "-w": "Count words only",
+            "-c": "Count bytes only",
+        },
+        "examples": [
+            "wc -l file.txt",
+            "cat access.log | wc -l",
+        ],
+        "combos": [
+            "cat log | grep 'ERROR' | wc -l   # count occurrences",
+        ],
+    },
+    "echo": {
+        "name": "echo",
+        "description": "Display a line of text or write data using redirection (> / >>).",
+        "syntax": "echo [text] [> file]",
+        "flags": {
+            "-n": "Do not output trailing newline",
+            ">": "Redirect output to overwrite a file",
+            ">>": "Redirect output to append to a file",
+        },
+        "examples": [
+            "echo 'hello operative'",
+            "echo 'token' > file.txt",
+            "echo 'more' >> file.txt",
+        ],
+        "combos": [
+            "echo 'KEY' > .auth   # write credential file",
+        ],
+    },
+    "man": {
+        "name": "man",
+        "description": "Display concise, beginner-friendly manual page for a command.",
+        "syntax": "man <command>",
+        "flags": {},
+        "examples": [
+            "man ls",
+            "man grep",
+            "man find",
+        ],
+        "combos": [
+            "man grep   # learn pattern search flags and examples",
+        ],
+    },
+    "lookup": {
+        "name": "lookup",
+        "description": "Quick lookup of command syntax, flags, and examples (alias for man).",
+        "syntax": "lookup <command>",
+        "flags": {},
+        "examples": [
+            "lookup chmod",
+            "lookup grep",
+        ],
+        "combos": [
+            "lookup find   # quick help on finding files",
+        ],
+    },
+    "help": {
+        "name": "help",
+        "description": "Display overview of available commands and gameplay controls.",
+        "syntax": "help [command]",
+        "flags": {},
+        "examples": [
+            "help",
+            "help cd",
+        ],
+        "combos": [
+            "help   # check available tools",
+        ],
+    },
+    "hint": {
+        "name": "hint",
+        "description": "Request progressive assistance for the current objective (Concept -> Category -> Direction).",
+        "syntax": "hint",
+        "flags": {},
+        "examples": [
+            "hint",
+        ],
+        "combos": [
+            "hint   # view progressive clue without HP penalty",
+        ],
+    },
 }
 
 
@@ -319,7 +492,43 @@ class Codex:
         for entry in self.list_commands():
             lines.append(f"  {entry['name']:<10} {entry['description']}")
         lines.append("")
-        lines.append("Type a command name to decrypt its full entry.")
+    def format_man_page(self, name: str) -> str:
+        """Format a clean, concise, beginner-friendly manual page."""
+        clean_name = str(name).strip().lower()
+        entry = self.get_command(clean_name)
+        if not entry:
+            matches = self.search_commands(clean_name)
+            if matches:
+                suggestions = ", ".join(f"'{m['name']}'" for m in matches[:3])
+                return f"No manual entry for '{name}'. Did you mean: {suggestions}?\nType 'help' to see all available commands.\n"
+            return f"No manual entry for '{name}'. Type 'help' for available commands.\n"
+
+        lines = [
+            "NAME",
+            f"    {entry['name']} - {entry['description']}",
+            "",
+            "SYNOPSIS",
+            f"    {entry['syntax']}",
+            "",
+            "DESCRIPTION",
+            f"    {entry['description']}",
+        ]
+        if entry.get("flags"):
+            lines.append("")
+            lines.append("OPTIONS & FLAGS")
+            for flag, desc in entry["flags"].items():
+                lines.append(f"    {flag:<12} {desc}")
+        if entry.get("examples"):
+            lines.append("")
+            lines.append("EXAMPLES")
+            for ex in entry["examples"]:
+                lines.append(f"    $ {ex}")
+        if entry.get("combos"):
+            lines.append("")
+            lines.append("TACTICAL COMBOS")
+            for combo in entry["combos"]:
+                lines.append(f"    » {combo}")
+        lines.append("")
         return "\n".join(lines)
 
 
@@ -374,6 +583,11 @@ def display_list() -> str:
     return CODEX.display_list()
 
 
+def format_man_page(name: str) -> str:
+    """Render a concise beginner-friendly manual page from the default codex."""
+    return CODEX.format_man_page(name)
+
+
 __all__ = [
     "COMMANDS",
     "REQUIRED_KEYS",
@@ -388,4 +602,5 @@ __all__ = [
     "get_examples",
     "display_command",
     "display_list",
+    "format_man_page",
 ]

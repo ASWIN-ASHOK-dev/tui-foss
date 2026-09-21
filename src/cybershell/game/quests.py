@@ -25,14 +25,14 @@ def get_sector_quests() -> Dict[int, Quest]:
         ),
         dialogue=[
             "Operative! Welcome back to the grid. Your memory registers appear scrambled.",
-            "First, verify your mainframe location using 'pwd'.",
-            "Next, inspect the sandbox contents using 'ls -la'.",
-            "Finally, establish our communications beacon using 'touch beacon.log'.",
+            "Verify your mainframe location coordinates before venturing forward.",
+            "Survey the sandbox environment to discover breadcrumbs and directories.",
+            "Deploy the operative beacon file 'beacon.log' to unlock the perimeter gate.",
         ],
         objectives=[
             Objective(
                 id="obj_0_1",
-                description="Determine your current directory coordinates inside the quarantine sandbox using 'pwd'.",
+                description="Verify your current location coordinates inside the quarantine sandbox.",
                 hint="Type 'pwd' at the prompt and press Enter to verify your location.",
                 command="pwd",
                 syntax="pwd",
@@ -40,21 +40,33 @@ def get_sector_quests() -> Dict[int, Quest]:
                 predicate_type="cwd_equals",
                 predicate_target="/home/operative",
                 xp_reward=50,
+                hints=[
+                    "Check where you are currently located in the mainframe filesystem.",
+                    "Look up the standard command that prints your working directory coordinates.",
+                    "Execute 'pwd' to confirm your coordinates.",
+                ],
+                scenario="System memory registers are scrambled. Confirm your terminal coordinates.",
             ),
             Objective(
                 id="obj_0_2",
-                description="Scan the quarantine filesystem for hidden files and security tokens using 'ls -la'.",
+                description="Survey the quarantine environment for directory assets, hidden files, and permissions.",
                 hint="Type 'ls -la' at the prompt and press Enter to inspect all files and permissions.",
                 command="ls",
-                syntax="ls -la",
+                syntax="ls [-la]",
                 explanation="Lists directory contents with detailed file permissions (-l) and hidden dotfiles (-a).",
                 predicate_type="file_exists",
                 predicate_target="/home/operative",
                 xp_reward=50,
+                hints=[
+                    "Inspect the contents of the current directory to see what files were left behind.",
+                    "Check 'man ls' to see how to list all directory contents including details.",
+                    "Run 'ls' or 'ls -la' to survey all files, directories, and hidden assets.",
+                ],
+                scenario="The incident left multiple status logs and system files. Inspect your surroundings.",
             ),
             Objective(
                 id="obj_0_3",
-                description="Deploy an operative status beacon file named 'beacon.log' using touch.",
+                description="Deploy an operative status beacon named 'beacon.log' to synchronize clearance.",
                 hint="Type 'touch beacon.log' at the prompt and press Enter to deploy the beacon.",
                 command="touch",
                 syntax="touch <filename>",
@@ -62,6 +74,12 @@ def get_sector_quests() -> Dict[int, Quest]:
                 predicate_type="file_exists",
                 predicate_target="beacon.log",
                 xp_reward=50,
+                hints=[
+                    "Place a new status file named 'beacon.log' in your active directory.",
+                    "The standard tool to create empty files without opening an editor is 'touch'.",
+                    "Execute 'touch beacon.log' to deploy your signal.",
+                ],
+                scenario="With reconnaissance complete, drop the recovery beacon to link with external grid.",
             ),
         ],
         reward_item=Item(
@@ -72,6 +90,25 @@ def get_sector_quests() -> Dict[int, Quest]:
             rarity="rare",
         ),
         reward_xp=100,
+        environment_tree={
+            "README.txt": (
+                "[QUARANTINE SECTOR NOTICE]\n"
+                "Emergency reboot occurred at 03:41 UTC.\n"
+                "System logs and breadcrumbs are preserved under logs/ and system/.\n"
+            ),
+            "logs": {
+                "incident.log": (
+                    "[SECTOR 0 INCIDENT REPORT]\n"
+                    "Alert: Unauthorized memory probe detected.\n"
+                    "Status: Sandbox locked down pending operative verification.\n"
+                ),
+                "boot.log": "System registers loaded successfully.\n",
+            },
+            "system": {
+                "telemetry.conf": "PORT=443\nNODE=SEC_0\nSTATUS=ONLINE\n",
+            },
+            ".easter_egg": "OPERATIVE SECRET: You explored the hidden dotfiles of Sector 0! (+50 XP)\n",
+        },
     )
 
     # Sector 1: The File Vault
@@ -86,14 +123,14 @@ def get_sector_quests() -> Dict[int, Quest]:
         ),
         dialogue=[
             "Operative, we have successfully infiltrated the corporate File Vault.",
-            "Record our reconnaissance telemetry by creating 'intel.txt' with touch.",
-            "Make a backup copy named 'intel.bak' with cp before modifying data.",
-            "Write the decryption key 'OMNICORP' into 'intel.txt' using echo and redirect (>).",
+            "Record our reconnaissance telemetry by creating 'intel.txt'.",
+            "Make a backup copy named 'intel.bak' before modifying critical data.",
+            "Store the vault decryption passphrase 'OMNICORP' into 'intel.txt' using redirection.",
         ],
         objectives=[
             Objective(
                 id="obj_1_1",
-                description="Create an operative reconnaissance telemetry file named 'intel.txt' using touch.",
+                description="Create an operative reconnaissance telemetry file named 'intel.txt'.",
                 hint="Type 'touch intel.txt' at the prompt and press Enter to create the file.",
                 command="touch",
                 syntax="touch <filename>",
@@ -101,10 +138,16 @@ def get_sector_quests() -> Dict[int, Quest]:
                 predicate_type="file_exists",
                 predicate_target="intel.txt",
                 xp_reward=75,
+                hints=[
+                    "Create an intel file named intel.txt to store reconnaissance findings.",
+                    "Use 'touch' with the desired file name.",
+                    "Execute 'touch intel.txt' at the prompt.",
+                ],
+                scenario="Create an active reconnaissance log before inspecting the vault archives.",
             ),
             Objective(
                 id="obj_1_2",
-                description="Duplicate your telemetry file to create a backup copy named 'intel.bak' using cp.",
+                description="Duplicate your telemetry file to create a backup copy named 'intel.bak'.",
                 hint="Type 'cp intel.txt intel.bak' at the prompt and press Enter to copy the file.",
                 command="cp",
                 syntax="cp <source_file> <dest_file>",
@@ -112,10 +155,16 @@ def get_sector_quests() -> Dict[int, Quest]:
                 predicate_type="file_exists",
                 predicate_target="intel.bak",
                 xp_reward=75,
+                hints=[
+                    "Duplicate your telemetry record so modifying it won't lose original state.",
+                    "Check 'man cp' to review file copy syntax.",
+                    "Run 'cp intel.txt intel.bak' to clone the file.",
+                ],
+                scenario="In corporate mainframe espionage, always duplicate critical intel files.",
             ),
             Objective(
                 id="obj_1_3",
-                description="Write the decrypted vault code 'OMNICORP' into 'intel.txt' using echo and redirect (>).",
+                description="Store the vault decryption code 'OMNICORP' into 'intel.txt' using redirection.",
                 hint="Type 'echo \"OMNICORP\" > intel.txt' at the prompt and press Enter to store the key.",
                 command="echo",
                 syntax="echo <text> > <filename>",
@@ -124,6 +173,12 @@ def get_sector_quests() -> Dict[int, Quest]:
                 predicate_target="intel.txt",
                 predicate_expected="OMNICORP",
                 xp_reward=100,
+                hints=[
+                    "Write the authorization phrase OMNICORP into intel.txt.",
+                    "Use 'echo' combined with the output redirection operator '>'.",
+                    "Execute 'echo \"OMNICORP\" > intel.txt'.",
+                ],
+                scenario="Write the discovered clearance code into your intel log to authorize transmission.",
             ),
         ],
         reward_item=Item(
@@ -134,6 +189,17 @@ def get_sector_quests() -> Dict[int, Quest]:
             rarity="common",
         ),
         reward_xp=150,
+        environment_tree={
+            "vault_notes.txt": (
+                "[VAULT ARCHIVE DIRECTORY]\n"
+                "Security clearance required for datastream transit.\n"
+                "Create an intel log and store the passkey OMNICORP.\n"
+            ),
+            ".vault_token": "VAULT_TOKEN=CIPHER_882_AUTH\n",
+            ".secret": {
+                ".vault_backup.key": "SECRET BONUS: Hidden vault passkey retrieved! (+50 XP)\n",
+            },
+        },
     )
 
     # Sector 2: The Datastream
@@ -148,14 +214,14 @@ def get_sector_quests() -> Dict[int, Quest]:
         ),
         dialogue=[
             "The packet density in this sector is dangerously high. Millions of packets are flowing past.",
-            "Construct a new directory folder named 'backup' using mkdir.",
-            "Navigate into your new directory using 'cd backup'.",
-            "Capture telemetry packets into 'packet.dump' using touch.",
+            "Construct a new directory folder named 'backup' for stream capture.",
+            "Navigate into your new directory to isolate capture operations.",
+            "Capture telemetry packets into 'packet.dump'.",
         ],
         objectives=[
             Objective(
                 id="obj_2_1",
-                description="Establish an organized telemetry repository by creating a directory named 'backup'.",
+                description="Construct an isolated telemetry folder named 'backup'.",
                 hint="Type 'mkdir backup' at the prompt and press Enter to construct the directory.",
                 command="mkdir",
                 syntax="mkdir <directory_name>",
@@ -163,10 +229,16 @@ def get_sector_quests() -> Dict[int, Quest]:
                 predicate_type="file_exists",
                 predicate_target="backup",
                 xp_reward=100,
+                hints=[
+                    "Set up an isolated directory folder named 'backup'.",
+                    "Check 'man mkdir' to see how directories are created.",
+                    "Run 'mkdir backup' to make the folder.",
+                ],
+                scenario="Establish an isolated directory to avoid cluttering root datastream telemetry.",
             ),
             Objective(
                 id="obj_2_2",
-                description="Navigate inside the newly created 'backup' directory using the cd command.",
+                description="Navigate inside the newly created 'backup' directory.",
                 hint="Type 'cd backup' at the prompt and press Enter to enter the directory.",
                 command="cd",
                 syntax="cd <directory_path>",
@@ -174,10 +246,16 @@ def get_sector_quests() -> Dict[int, Quest]:
                 predicate_type="cwd_equals",
                 predicate_target="/home/operative/backup",
                 xp_reward=100,
+                hints=[
+                    "Shift your active terminal context into the backup directory.",
+                    "Use the change directory tool 'cd'.",
+                    "Execute 'cd backup'.",
+                ],
+                scenario="Move your terminal session inside the storage folder.",
             ),
             Objective(
                 id="obj_2_3",
-                description="Capture incoming packet streams by creating a file named 'packet.dump' in backup.",
+                description="Capture incoming packet streams into 'packet.dump' inside backup.",
                 hint="Type 'touch packet.dump' at the prompt and press Enter to create the capture file.",
                 command="touch",
                 syntax="touch <filename>",
@@ -185,6 +263,12 @@ def get_sector_quests() -> Dict[int, Quest]:
                 predicate_type="file_exists",
                 predicate_target="/home/operative/backup/packet.dump",
                 xp_reward=100,
+                hints=[
+                    "Create packet.dump in your current directory.",
+                    "Use 'touch' with the filename.",
+                    "Run 'touch packet.dump'.",
+                ],
+                scenario="Deploy a stream capture file to store packet telemetry.",
             ),
         ],
         reward_item=Item(
@@ -195,6 +279,19 @@ def get_sector_quests() -> Dict[int, Quest]:
             rarity="uncommon",
         ),
         reward_xp=200,
+        environment_tree={
+            "summary.txt": (
+                "[DATASTREAM TELEMETRY]\n"
+                "High density traffic dump available.\n"
+                "Stage incoming streams in a dedicated backup folder.\n"
+            ),
+            "traffic.log": (
+                "[04:10:00] TCP 192.168.1.1:443 -> 10.0.0.1:8080 ACK\n"
+                "[04:12:15] UDP 192.168.1.5:53 -> 8.8.8.8:53 QUERY\n"
+                "[04:15:33] CRITICAL_ALERT: Rogue stream signature AUTH_KEY=SIGMA-404-BYPASS\n"
+                "[04:18:22] TCP 192.168.1.10:443 -> 10.0.0.1:8080 ACK\n"
+            ),
+        },
     )
 
     # Sector 3: Execution Core
@@ -209,14 +306,14 @@ def get_sector_quests() -> Dict[int, Quest]:
         ),
         dialogue=[
             "We located an automation script named 'run.sh', but its execution permissions have been locked.",
-            "Use 'chmod 755 /home/operative/run.sh' to grant read, write, and execute permissions.",
+            "Restore read, write, and execute permissions (755) to 'run.sh' using chmod.",
             "Secure 'firewall.log' by setting permissions to owner-only read/write (chmod 600).",
-            "Generate an operative countermeasure script named 'exploit.sh' using touch.",
+            "Generate an operative countermeasure script named 'exploit.sh'.",
         ],
         objectives=[
             Objective(
                 id="obj_3_1",
-                description="Grant executable permissions (755) to the automation script 'run.sh' using chmod.",
+                description="Restore executable permissions (755) to the automation script 'run.sh' using chmod.",
                 hint="Type 'chmod 755 /home/operative/run.sh' or navigate back home and run 'chmod 755 run.sh'.",
                 command="chmod",
                 syntax="chmod 755 <filename>",
@@ -225,6 +322,12 @@ def get_sector_quests() -> Dict[int, Quest]:
                 predicate_target="/home/operative/run.sh",
                 predicate_expected="755",
                 xp_reward=150,
+                hints=[
+                    "Check the file permissions with 'ls -l', then update them.",
+                    "Check 'man chmod' to review octal mode 755 (read, write, execute for owner).",
+                    "Run 'chmod 755 /home/operative/run.sh' or 'chmod 755 run.sh'.",
+                ],
+                scenario="The diagnostic script cannot execute without proper execution permissions.",
             ),
             Objective(
                 id="obj_3_2",
@@ -237,6 +340,12 @@ def get_sector_quests() -> Dict[int, Quest]:
                 predicate_target="/home/operative/firewall.log",
                 predicate_expected="600",
                 xp_reward=150,
+                hints=[
+                    "Secure firewall.log so only the owner can read or write to it.",
+                    "Mode 600 sets read/write for owner and denies access to group/others.",
+                    "Execute 'chmod 600 /home/operative/firewall.log'.",
+                ],
+                scenario="Prevent unauthorized users from reading system firewall logs.",
             ),
             Objective(
                 id="obj_3_3",
@@ -248,6 +357,12 @@ def get_sector_quests() -> Dict[int, Quest]:
                 predicate_type="file_exists",
                 predicate_target="/home/operative/exploit.sh",
                 xp_reward=150,
+                hints=[
+                    "Create exploit.sh in /home/operative to stage payload delivery.",
+                    "Use 'touch' with the full path or filename.",
+                    "Run 'touch /home/operative/exploit.sh'.",
+                ],
+                scenario="Prepare the exploit script required for penetrating the next sector barrier.",
             ),
         ],
         reward_item=Item(
@@ -258,6 +373,17 @@ def get_sector_quests() -> Dict[int, Quest]:
             rarity="epic",
         ),
         reward_xp=300,
+        environment_tree={
+            "run.sh": {
+                "content": '#!/bin/bash\necho "Execution Core operational."\n',
+                "permissions": 0o644,
+            },
+            "firewall.log": {
+                "content": "ERROR: Security perimeter breached.\nALERT: Sentinel Overlord daemon detected.\n",
+                "permissions": 0o644,
+            },
+            "policy.txt": "Security Policy: Core scripts require 755; security logs require 600.\n",
+        },
     )
 
     # Sector 4: The Firewall
@@ -279,7 +405,7 @@ def get_sector_quests() -> Dict[int, Quest]:
         objectives=[
             Objective(
                 id="obj_4_1",
-                description="Inspect the perimeter defense records by reading 'firewall.log' using the cat command.",
+                description="Inspect the perimeter defense records by reading 'firewall.log' using cat.",
                 hint="Type 'cat /home/operative/firewall.log' at the prompt and press Enter.",
                 command="cat",
                 syntax="cat <filename>",
@@ -287,6 +413,12 @@ def get_sector_quests() -> Dict[int, Quest]:
                 predicate_type="file_exists",
                 predicate_target="/home/operative/firewall.log",
                 xp_reward=200,
+                hints=[
+                    "Inspect the defense records stored in firewall.log.",
+                    "Check 'man cat' to see how files are read and output to the terminal.",
+                    "Run 'cat /home/operative/firewall.log'.",
+                ],
+                scenario="Read through the firewall security logs to identify bypass opportunities.",
             ),
             Objective(
                 id="obj_4_2",
@@ -299,6 +431,12 @@ def get_sector_quests() -> Dict[int, Quest]:
                 predicate_target="/home/operative/firewall.log",
                 predicate_expected="BYPASS_ALPHA",
                 xp_reward=200,
+                hints=[
+                    "Append the authorization bypass code to the end of firewall.log.",
+                    "Use 'echo' with the append operator '>>' so previous contents remain intact.",
+                    "Execute 'echo \"BYPASS_ALPHA\" >> /home/operative/firewall.log'.",
+                ],
+                scenario="Inject the bypass authentication key directly into the active firewall stream.",
             ),
             Objective(
                 id="obj_4_3",
@@ -310,6 +448,12 @@ def get_sector_quests() -> Dict[int, Quest]:
                 predicate_type="file_exists",
                 predicate_target="/home/operative/exploits",
                 xp_reward=200,
+                hints=[
+                    "Create the directory path /home/operative/exploits.",
+                    "Check 'man mkdir' to review the -p flag for creating parent folders if needed.",
+                    "Run 'mkdir -p /home/operative/exploits'.",
+                ],
+                scenario="Build a dedicated repository folder for staging root breach tools.",
             ),
         ],
         reward_item=Item(
@@ -320,6 +464,14 @@ def get_sector_quests() -> Dict[int, Quest]:
             rarity="legendary",
         ),
         reward_xp=400,
+        environment_tree={
+            "firewall.log": (
+                "DROP packet from 10.0.0.1\n"
+                "ALERT: BREACH_ALERT connection established\n"
+                "PASS packet to 192.168.1.5\n"
+            ),
+            "rules.conf": "Firewall Rule 1: Append bypass key >> to permit passage.\n",
+        },
     )
 
     # Sector 5: Sentinel Boss
@@ -341,7 +493,7 @@ def get_sector_quests() -> Dict[int, Quest]:
         objectives=[
             Objective(
                 id="obj_5_1",
-                description="Breach the central mainframe root chamber by navigating to '/root' using the cd command.",
+                description="Breach the central mainframe root chamber by navigating to '/root'.",
                 hint="Type 'cd /root' at the prompt and press Enter to access the system root chamber.",
                 command="cd",
                 syntax="cd /root",
@@ -349,10 +501,16 @@ def get_sector_quests() -> Dict[int, Quest]:
                 predicate_type="cwd_equals",
                 predicate_target="/root",
                 xp_reward=400,
+                hints=[
+                    "Move into the central administrative chamber at /root.",
+                    "Use 'cd' with the target absolute path.",
+                    "Run 'cd /root'.",
+                ],
+                scenario="Access the core administrative chamber where the rogue AI process executes.",
             ),
             Objective(
                 id="obj_5_2",
-                description="Establish an administrative security lockfile named '/root/override.lock' using touch.",
+                description="Establish an administrative security lockfile named '/root/override.lock'.",
                 hint="Type 'touch /root/override.lock' at the prompt and press Enter to lock the core.",
                 command="touch",
                 syntax="touch /root/override.lock",
@@ -360,6 +518,12 @@ def get_sector_quests() -> Dict[int, Quest]:
                 predicate_type="file_exists",
                 predicate_target="/root/override.lock",
                 xp_reward=400,
+                hints=[
+                    "Create the override.lock file inside /root to halt AI deletion threads.",
+                    "Use 'touch' with the destination path.",
+                    "Execute 'touch /root/override.lock'.",
+                ],
+                scenario="Lock down the rogue deletion daemon before it purges operative telemetry.",
             ),
             Objective(
                 id="obj_5_3",
@@ -372,6 +536,12 @@ def get_sector_quests() -> Dict[int, Quest]:
                 predicate_target="/root/core.flag",
                 predicate_expected="SYSTEM_RESTORED",
                 xp_reward=500,
+                hints=[
+                    "Broadcast the liberation flag code into /root/core.flag.",
+                    "Use 'echo' with the redirect operator '>' to write to the file.",
+                    "Run 'echo \"SYSTEM_RESTORED\" > /root/core.flag'.",
+                ],
+                scenario="Neutralize Sentinel Overlord and liberate the entire corporate mainframe!",
             ),
         ],
         reward_item=Item(
@@ -382,6 +552,16 @@ def get_sector_quests() -> Dict[int, Quest]:
             rarity="mythic",
         ),
         reward_xp=1000,
+        environment_tree={
+            "/root": {
+                "overlord.conf": (
+                    "[SENTINEL OVERLORD CONTROL CORE]\n"
+                    "STATUS: HOSTILE_TAKEOVER\n"
+                    "OVERRIDE_PASSPHRASE=\"SYSTEM_RESTORED\"\n"
+                ),
+                "daemon.lock": "DAEMON LOCK ACTIVE\n",
+            },
+        },
     )
 
     return quests

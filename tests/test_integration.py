@@ -634,6 +634,169 @@ class TestCyberShellIntegration(unittest.TestCase):
         self.assertIn("New Campaign", save_screen)
         self.assertIn("OPERATIVE: -15 HP", save_screen)
 
+    def test_wargame_discovery_tools(self) -> None:
+        """Verify man, lookup, help, and find commands in interpreter."""
+        from cybershell.engine.interpreter import Interpreter
+
+        interpreter = Interpreter(vfs=self.vfs)
+
+        # man ls
+        res_man = interpreter.execute("man ls")
+        self.assertEqual(res_man.exit_code, 0)
+        self.assertIn("NAME", res_man.stdout)
+        self.assertIn("ls", res_man.stdout)
+
+        # lookup grep
+        res_lookup = interpreter.execute("lookup grep")
+        self.assertEqual(res_lookup.exit_code, 0)
+        self.assertIn("grep", res_lookup.stdout)
+
+        # help
+        res_help = interpreter.execute("help")
+        self.assertEqual(res_help.exit_code, 0)
+        self.assertIn("CYBERSHELL TACTICAL COMMAND SUITE", res_help.stdout)
+
+        # find
+        self.vfs.mkdir_p("/home/operative/logs")
+        self.vfs.touch("/home/operative/logs/secret.log")
+        res_find = interpreter.execute("find . -name secret.log")
+        self.assertEqual(res_find.exit_code, 0)
+        self.assertIn("secret.log", res_find.stdout)
+
+    def test_wargame_hints_and_streaks(self) -> None:
+        """Verify progressive hints, streak tracking, and badges."""
+        from cybershell.run import get_progressive_hint
+
+        obj = Objective(
+            id="obj_custom",
+            description="Inspect firewall logs.",
+            command="cat",
+            hints=[
+                "Check the logs folder.",
+                "Inspect firewall.log with cat.",
+                "Execute 'cat firewall.log'",
+            ],
+        )
+
+        h1, c1 = get_progressive_hint(obj, tier=1, cadet_mode=True)
+        self.assertIn("Check the logs folder", h1)
+        self.assertEqual(c1, 0)
+
+        h2, c2 = get_progressive_hint(obj, tier=2, cadet_mode=True)
+        self.assertIn("Inspect firewall.log with cat", h2)
+
+        h3, c3 = get_progressive_hint(obj, tier=3, cadet_mode=True)
+        self.assertIn("Execute 'cat firewall.log'", h3)
+
+        # Streak & badges
+        p = PlayerStats(character_name="Ghost", hp=100, max_hp=100, xp=0)
+        self.assertEqual(p.streak, 0)
+        p.increase_streak()
+        self.assertEqual(p.streak, 1)
+        p.increase_streak()
+        self.assertEqual(p.streak, 2)
+        self.assertEqual(p.max_streak, 2)
+        p.reset_streak()
+        self.assertEqual(p.streak, 0)
+        self.assertEqual(p.max_streak, 2)
+
+        added = p.add_badge("Terminal Ninja 🥷")
+        self.assertTrue(added)
+        self.assertFalse(p.add_badge("Terminal Ninja 🥷"))
+        self.assertIn("Terminal Ninja 🥷", p.badges)
+
+    def test_wargame_easter_egg_secret_hunter(self) -> None:
+        """Verify discovering hidden filesystem easter eggs awards bonus XP and Secret Hunter badge."""
+        from cybershell.game.evaluator import QuestEvaluator
+        from cybershell.game.quests import get_sector_quests
+
+        evaluator = QuestEvaluator()
+        p = PlayerStats(character_name="Shadow", hp=100, max_hp=100, xp=0)
+        quests = get_sector_quests()
+        quest = quests[0]
+
+        evaluator.check_quest_progress(quest, self.vfs, p, last_command="cat .easter_egg")
+        self.assertEqual(p.xp, 50)
+        self.assertIn("Secret Hunter 🎁", p.badges)
+        self.assertIn(".easter_egg", p.secrets_found)
+
+    def test_compact_hud_and_celebration_banners(self) -> None:
+        """Verify draw_compact_hud, access granted banner, and level unlocked banner format cleanly."""
+        from cybershell.ui.ascii_art import (
+            get_access_granted_banner,
+            get_level_unlocked_banner,
+        )
+        from cybershell.ui.renderer import draw_compact_hud
+
+        hud = draw_compact_hud(
+            character_name="Neo",
+            level_num=1,
+            sector_name="File Vault",
+            xp=250,
+            streak=3,
+            objective_desc="Recover the encrypted crypto ledger.",
+            hp=90,
+            max_hp=100,
+            width=80,
+            styled=False,
+        )
+        hud_lines = hud.splitlines()
+        self.assertEqual(len(hud_lines), 4)
+        self.assertIn("OPERATIVE: Neo", hud_lines[1])
+        self.assertIn("HP: 90/100", hud_lines[1])
+        self.assertIn("LEVEL 01: FILE VAULT", hud_lines[1])
+        self.assertIn("OBJECTIVE: Recover the encrypted crypto ledger.", hud_lines[2])
+
+        granted = get_access_granted_banner("LEDGER RECOVERED", 100, streak=3, badge="Vault Master", styled=False)
+        self.assertIn("★ ACCESS GRANTED ★", granted)
+        self.assertIn("LEDGER RECOVERED", granted)
+        self.assertIn("+100 XP REWARDED", granted)
+        self.assertIn("STREAK MULTIPLIER: 3 🔥", granted)
+        self.assertIn("Vault Master", granted)
+
+        unlocked = get_level_unlocked_banner(2, "Data Network", styled=False)
+        self.assertIn("LEVEL 02 UNLOCKED", unlocked)
+        self.assertIn("SECTOR: DATA NETWORK", unlocked)
+
+    def test_interactive_game_loop_stream_simulation(self) -> None:
+        """Simulate interactive game loop with wargame commands, ensuring zero typo damage and progression."""
+        import io
+        from unittest.mock import patch
+        from cybershell.run import interactive_game_loop
+
+        player = PlayerStats(character_name="Zero", hp=100, max_hp=100, xp=0, current_sector=0)
+        vfs = VirtualFileSystem(default_user="operative")
+
+        mock_inputs = [
+            "man ls",           # manual page
+            "lookup grep",      # command lookup
+            "status",           # telemetry & badges
+            "hint",             # progressive clue
+            "pwd",              # complete obj 1
+            "sl",               # typo test: must NOT deduct HP!
+            "ls -la",           # complete obj 2
+            "touch beacon.log", # complete obj 3 & sector 0
+            "menu",             # exit cleanly
+        ]
+
+        captured_stdout = io.StringIO()
+        with patch("builtins.input", side_effect=mock_inputs), patch("sys.stdout", captured_stdout):
+            interactive_game_loop(
+                character_name=player.character_name,
+                start_sector=0,
+                player=player,
+                vfs=vfs,
+                cadet_mode=False,  # Even in operative mode, typos cause 0 HP damage!
+            )
+
+        # Verify progression
+        self.assertEqual(player.hp, player.max_hp)  # No HP damage from 'sl' typo!
+        self.assertGreater(player.xp, 0)
+        self.assertGreaterEqual(player.level, 2)
+        self.assertGreaterEqual(player.streak, 1)
+        self.assertIn(0, player.completed_sectors)
+        self.assertEqual(player.current_sector, 1)
+
 
 if __name__ == "__main__":
     unittest.main()

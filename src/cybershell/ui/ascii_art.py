@@ -292,3 +292,61 @@ def get_defeat_banner(styled: bool = False) -> str:
     if not styled:
         return DEFEAT_BANNER
     return f"{BOLD}{RED}{DEFEAT_BANNER}{RESET}"
+
+
+def get_access_granted_banner(
+    title: str = "OBJECTIVE COMPLETE",
+    xp_awarded: int = 100,
+    streak: int = 0,
+    badge: Optional[str] = None,
+    width: int = 60,
+    styled: bool = True,
+) -> str:
+    """Render a high-impact ACCESS GRANTED celebration box."""
+    width = max(40, width)
+    inner = width - 4
+    b_top = f"╔{'═' * (width - 2)}╗"
+    b_bot = f"╚{'═' * (width - 2)}╝"
+    bar_sep = f"╟{'─' * (width - 2)}╢"
+
+    lines = [
+        b_top,
+        f"║{f'★ ACCESS GRANTED ★':^{inner}}║",
+        f"║{title:^{inner}}║",
+        bar_sep,
+        f"║{f'+{xp_awarded} XP REWARDED':^{inner}}║",
+    ]
+    if streak > 1:
+        lines.append(f"║{f'STREAK MULTIPLIER: {streak} 🔥':^{inner}}║")
+    if badge:
+        lines.append(f"║{f'ACHIEVEMENT UNLOCKED: [{badge}]':^{inner}}║")
+    lines.append(b_bot)
+
+    plain = "\n".join(lines)
+    if not styled:
+        return plain
+    return f"{BOLD}{GREEN}{plain}{RESET}"
+
+
+def get_level_unlocked_banner(
+    sector_num: int,
+    sector_name: str,
+    width: int = 60,
+    styled: bool = True,
+) -> str:
+    """Render a LEVEL UNLOCKED transition banner."""
+    width = max(40, width)
+    inner = width - 4
+    b_top = f"╭{'─' * (width - 2)}╮"
+    b_bot = f"╰{'─' * (width - 2)}╯"
+    lines = [
+        b_top,
+        f"│{f'LEVEL {sector_num:02d} UNLOCKED':^{inner}}│",
+        f"│{f'SECTOR: {sector_name.upper()}':^{inner}}│",
+        b_bot,
+    ]
+    plain = "\n".join(lines)
+    if not styled:
+        return plain
+    return f"{BOLD}{CYAN}{plain}{RESET}"
+

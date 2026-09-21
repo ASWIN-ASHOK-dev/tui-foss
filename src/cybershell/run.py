@@ -64,11 +64,15 @@ from cybershell.ui.ascii_art import (
     WHITE,
     YELLOW,
     format_boss_hp_bar,
+    get_access_granted_banner,
+    get_level_unlocked_banner,
     get_logo,
     get_portrait,
     get_siren_banner,
+    get_victory_banner,
 )
 from cybershell.ui.renderer import (
+    draw_compact_hud,
     draw_double_header,
     draw_panel,
     draw_split_panels,
@@ -217,7 +221,9 @@ def delete_saved_game(filepath: str = SAVE_FILE_PATH) -> bool:
 
 KNOWN_COMMANDS = [
     "pwd", "ls", "cd", "cat", "touch", "mkdir", "chmod", "grep",
-    "clear", "help", "hint", "tree", "explain", "menu", "codex",
+    "find", "echo", "head", "tail", "wc", "cp", "mv", "rm",
+    "man", "lookup", "help", "hint", "status", "badges",
+    "clear", "tree", "explain", "menu", "codex",
     "items", "inventory", "map", "minigame", "cadet", "operative",
     "save", "exit", "quit",
 ]
@@ -427,17 +433,23 @@ def get_progressive_hint(
     - Tier 2 (Syntax): Expected command syntax pattern (0 HP Cadet / 3 HP Operative).
     - Tier 3 (Direct): Exact command solution (0 HP Cadet / 5 HP Operative).
     """
-    if tier == 1:
-        msg = f"[HINT TIER 1 // CONCEPT] Focus on the directive objective: {active_obj.description}"
-        cost = 0 if cadet_mode else 2
-    elif tier == 2:
-        syntax_tip = active_obj.syntax if active_obj.syntax else active_obj.command
-        msg = f"[HINT TIER 2 // SYNTAX PATTERN] Use the syntax: {syntax_tip}"
-        cost = 0 if cadet_mode else 3
+    hints = getattr(active_obj, "hints", None) or []
+    if hints:
+        idx = max(0, min(tier - 1, len(hints) - 1))
+        tier_tags = {1: "CONCEPT", 2: "SYNTAX PATTERN", 3: "DIRECT SOLUTION"}
+        tag = tier_tags.get(tier, "CLUE")
+        msg = f"[HINT TIER {tier} // {tag}] {hints[idx]}"
     else:
-        sol = active_obj.command if active_obj.command else (active_obj.hint or "Execute directive.")
-        msg = f"[HINT TIER 3 // DIRECT SOLUTION] Enter exact command: {sol}"
-        cost = 0 if cadet_mode else 5
+        if tier == 1:
+            msg = f"[HINT TIER 1 // CONCEPT] Focus on the directive objective: {active_obj.description}"
+        elif tier == 2:
+            syntax_tip = active_obj.syntax if active_obj.syntax else active_obj.command
+            msg = f"[HINT TIER 2 // SYNTAX PATTERN] Use the syntax: {syntax_tip}"
+        else:
+            sol = active_obj.command if active_obj.command else (active_obj.hint or "Execute directive.")
+            msg = f"[HINT TIER 3 // DIRECT SOLUTION] Enter exact command: {sol}"
+
+    cost = 0 if cadet_mode else (2 if tier == 1 else (3 if tier == 2 else 5))
     return msg, cost
 
 
@@ -948,7 +960,7 @@ def interactive_game_loop(
     app: Optional[RPGApp] = None,
     cadet_mode: bool = True,
 ) -> None:
-    """Interactive Learning Interface game loop with uncluttered directives and beginner tools."""
+    """Interactive wargame terminal loop with compact HUD and unified sequential stream."""
     if player is None:
         player = PlayerStats(
             character_name=character_name,
@@ -980,112 +992,38 @@ def interactive_game_loop(
     if not quest:
         quest = all_quests[0]
 
-    ticker_msg = "MISSION LAB ACTIVE // Complete directives below."
+    # Preload sector environment files into VFS
+    vfs.load_sector(player.current_sector, quest)
+
     init_w, _ = terminal_size()
-    panel_content_w = max(20, ((init_w - 2) // 2) - 6)
-    banner_bar = "═" * panel_content_w
-    mode_text = "CADET (SAFE)" if cadet_mode else "OPERATIVE (HARD)"
+    box_w = min(init_w - 4, 66)
     terminal_logs: List[str] = [
-        f"{GREEN}╔{banner_bar}╗{RESET}",
-        f"{GREEN}║{f'CYBERSHELL v{__version__} MISSION LAB':^{panel_content_w}}║{RESET}",
-        f"{GREEN}╚{banner_bar}╝{RESET}",
-        f"{CYAN}Operative '{player.character_name}' link established in Sector {player.current_sector}.{RESET}",
-        f"{YELLOW}Difficulty Mode: {mode_text}{RESET}",
-        f"{WHITE}Type 'help' for commands, 'explain' for syntax, or 'menu' to return.{RESET}",
-        f"{DIM}{'─' * (panel_content_w + 2)}{RESET}",
+        f"{CYAN}┌─[ CYBERSHELL v{__version__} // WARGAME TERMINAL ]{'─' * max(2, box_w - 38)}┐{RESET}",
+        f"{WHITE}  Infiltrating {quest.sector_name.upper()} (Sector {player.current_sector}/5).{RESET}",
+        f"{DIM}  Type 'help' for commands, 'man <cmd>' for field manuals, 'hint' for clues.{RESET}",
+        f"{CYAN}└{'─' * max(2, box_w - 1)}┘{RESET}",
     ]
 
     hint_tier = 1
     last_objective_id: Optional[str] = None
 
     while True:
-        width, _ = terminal_size()
+        width, height = terminal_size()
         app.hp = player.hp
         app.max_hp = player.max_hp
         app.xp = player.xp
         app.inventory = player.inventory
 
-        # Clear screen and display layout
-        sys.stdout.write("\033[H\033[J")
-        header = draw_double_header(
-            player.character_name,
-            player.hp,
-            player.max_hp,
-            player.xp,
-            f"SECTOR {player.current_sector}: {quest.sector_name.upper()}",
-            width,
-            styled=True,
-        )
-
-        left_width = (width - 2) // 2
-        content_width = max(10, left_width - 4)
-
-        # Active objective tracking & task number (1 of 3, 2 of 3, 3 of 3)
+        # Active objective tracking
         active_obj = quest.current_objective
-        if active_obj and active_obj in quest.objectives:
-            task_num = quest.objectives.index(active_obj) + 1
+        if active_obj:
+            obj_desc = active_obj.description
         else:
-            task_num = 3
+            obj_desc = "All sector directives completed! Advance to next sector."
 
         if active_obj and active_obj.id != last_objective_id:
             last_objective_id = active_obj.id
             hint_tier = 1
-
-        mode_badge = (
-            f"{GREEN}CADET (SAFE){RESET}"
-            if cadet_mode
-            else f"{RED}OPERATIVE (BACKLASH){RESET}"
-        )
-
-        # Left panel: UNCLUTTERED, focused only on active level and task
-        intel_lines = [
-            f"{CYAN}{BOLD}[ SECTOR {quest.sector_id}/5: {quest.sector_name.upper()} ]{RESET}",
-            f"{WHITE}Handler:{RESET} {CYAN}{quest.npc_name.upper()}{RESET}  |  {WHITE}Mode:{RESET} {mode_badge}",
-            f"{YELLOW}Sector Progress:{RESET} {WHITE}{BOLD}Task {task_num} of 3{RESET}",
-            "",
-            f"{GREEN}{BOLD}[ ACTIVE DIRECTIVE // TASK {task_num} OF 3 ]{RESET}",
-        ]
-
-        if active_obj:
-            for d_line in wrap_text(
-                f"🎯 {active_obj.description}", content_width, style=WHITE + BOLD
-            ):
-                intel_lines.append(d_line)
-            intel_lines.append("")
-
-            # In-Screen Command Syntax & Briefing Box (Requested explicitly)
-            intel_lines.append(f"{YELLOW}{BOLD}[ COMMAND SYNTAX & BRIEFING ]{RESET}")
-            cmd_name = active_obj.command if active_obj.command else "command"
-            syntax_str = active_obj.syntax if active_obj.syntax else cmd_name
-            expl_str = (
-                active_obj.explanation
-                if active_obj.explanation
-                else "Execute to fulfill objective."
-            )
-            intel_lines.append(f"  {CYAN}Command:{RESET} {WHITE}{BOLD}{cmd_name}{RESET}")
-            intel_lines.append(f"  {CYAN}Syntax:{RESET}  {YELLOW}{syntax_str}{RESET}")
-            for e_line in wrap_text(f"Purpose: {expl_str}", content_width - 2, style=WHITE):
-                intel_lines.append(f"  {e_line}")
-            intel_lines.append("")
-
-            # Radio transmission: only current task dialogue
-            intel_lines.append(f"{CYAN}{BOLD}[ RADIO // {quest.npc_name.upper()} ]{RESET}")
-            diag_idx = min(task_num - 1, max(0, len(quest.dialogue) - 1))
-            task_diag = (
-                quest.dialogue[diag_idx]
-                if quest.dialogue
-                else "Operative, proceed with the directive."
-            )
-            for t_line in wrap_text(f'"{task_diag}"', content_width, style=YELLOW):
-                intel_lines.append(t_line)
-        else:
-            intel_lines.append(f"{GREEN}{BOLD}✓ ALL 3 SECTOR TASKS COMPLETED!{RESET}")
-            intel_lines.append(f"{CYAN}Liberation sequence ready. Advance to next sector.{RESET}")
-
-        intel_lines.append("")
-        intel_lines.append(
-            f"{DIM}Commands: [hint] [explain] [tree] [cadet] [operative] [save] [menu]{RESET}"
-        )
 
         # Boss HUD if in Sector 5
         boss_banner = ""
@@ -1101,25 +1039,37 @@ def interactive_game_loop(
 
         cwd_short = vfs.get_cwd_path().replace(f"/home/{vfs.user}", "~")
 
-        # Split panels with styled borders
-        max_log_lines = max(16, len(intel_lines) - 2)
-        console_display = list(terminal_logs[-max_log_lines:])
-        console_display.append(f"{GREEN}operative@cybershell:{cwd_short}$ {RESET}\033[7m \033[0m")
-        panels = draw_split_panels(
-            f"{CYAN}{BOLD}MISSION INTEL & DIRECTIVE{RESET}",
-            intel_lines,
-            f"{GREEN}{BOLD}ACTIVE TERMINAL CONSOLE{RESET}",
-            console_display,
-            width,
+        # Compact 4-line HUD at the top
+        hud = draw_compact_hud(
+            character_name=player.character_name,
+            level_num=player.current_sector,
+            sector_name=quest.sector_name,
+            xp=player.xp,
+            streak=getattr(player, "streak", 0),
+            objective_desc=obj_desc,
+            hp=player.hp,
+            max_hp=player.max_hp,
+            width=width,
             styled=True,
         )
 
-        sys.stdout.write(header + "\n" + boss_banner + panels + "\n")
-        sys.stdout.write(f"\033[1;97;44m [ {ticker_msg} ] \033[0m\n")
+        # Clear screen and display compact HUD
+        sys.stdout.write("\033[H\033[J")
+        sys.stdout.write(hud + "\n")
+        if boss_banner:
+            sys.stdout.write(boss_banner)
+
+        # Calculate available lines so the prompt appears sequentially below latest output
+        overhead = 5 + (boss_banner.count("\n") if boss_banner else 0)
+        available_lines = max(10, height - overhead - 2)
+        display_logs = terminal_logs[-available_lines:] if len(terminal_logs) > available_lines else terminal_logs
+        for line in display_logs:
+            sys.stdout.write(line + "\n")
+        sys.stdout.flush()
 
         # Health check
         if player.hp <= 0:
-            print("\n" + f"{RED}{BOLD}💀 SYSTEM CRITICAL: ELECTRICAL BACKLASH OVERLOAD. OPERATIVE TERMINATED. 💀{RESET}".center(width + 15))
+            print("\n" + f"{RED}{BOLD}💀 SYSTEM CRITICAL: OPERATIVE TERMINATED. 💀{RESET}".center(width + 15))
             print(f"{YELLOW}Rebooting operative mainframe link in sandbox safe mode...{RESET}\n")
             player.hp = 100
             try:
@@ -1168,34 +1118,56 @@ def interactive_game_loop(
             continue
 
         if input_lower == "clear":
-            terminal_logs = [f"{DIM}(terminal console cleared){RESET}"]
+            terminal_logs = []
             continue
 
         if input_lower == "save":
             saved = save_game(player, cadet_mode)
+            terminal_logs.append(f"{GREEN}operative@cybershell:{cwd_short}$ save{RESET}")
             if saved:
                 terminal_logs.append(f"{GREEN}💾 Game progress saved to ~/.cybershell_save.json!{RESET}")
-                ticker_msg = "CHECKPOINT SAVED // Progress preserved."
             else:
                 terminal_logs.append(f"{RED}Failed to write save file.{RESET}")
+            continue
+
+        if input_lower in ("status", "badges"):
+            terminal_logs.append(f"{GREEN}operative@cybershell:{cwd_short}$ {user_input}{RESET}")
+            terminal_logs.append(f"{CYAN}{BOLD}[ OPERATIVE STATUS & TELEMETRY ]{RESET}")
+            terminal_logs.append(
+                f"  {WHITE}Operative:{RESET} {CYAN}{player.character_name}{RESET}  "
+                f"{YELLOW}Rank:{RESET} {player.rank} (Lvl {player.level})  "
+                f"{RED}HP:{RESET} {player.hp}/{player.max_hp}  "
+                f"{MAGENTA}XP:{RESET} {player.xp}  "
+                f"{YELLOW}Score:{RESET} {getattr(player, 'score', player.xp)}"
+            )
+            streak_val = getattr(player, "streak", 0)
+            max_streak_val = getattr(player, "max_streak", 0)
+            hints_used = getattr(player, "hints_used", 0)
+            sec_found = len(getattr(player, "secrets_found", []))
+            terminal_logs.append(
+                f"  {YELLOW}Streak:{RESET} {streak_val} (Max: {max_streak_val})  "
+                f"{CYAN}Hints Used:{RESET} {hints_used}  "
+                f"{GREEN}Secrets Discovered:{RESET} {sec_found}"
+            )
+            raw_badges = getattr(player, "badges", [])
+            badges_str = " ".join(f"[{b}]" for b in raw_badges) if raw_badges else "None yet"
+            terminal_logs.append(f"  {YELLOW}Badges Unlocked:{RESET} {badges_str}")
             continue
 
         if input_lower == "cadet":
             cadet_mode = True
             save_game(player, cadet_mode)
             terminal_logs.append(
-                f"{GREEN}{BOLD}🛡️ [CADET MODE ENGAGED] Backlash damage waived (0 HP). Free hints enabled.{RESET}"
+                f"{GREEN}{BOLD}🛡️ [CADET MODE ENGAGED] Free progressive hints active.{RESET}"
             )
-            ticker_msg = "CADET MODE ENGAGED // Safe learning environment active."
             continue
 
         if input_lower == "operative":
             cadet_mode = False
             save_game(player, cadet_mode)
             terminal_logs.append(
-                f"{RED}{BOLD}⚡ [OPERATIVE MODE ENGAGED] High stakes enabled. Syntax errors cause -15 HP backlash.{RESET}"
+                f"{YELLOW}{BOLD}⚡ [OPERATIVE MODE ENGAGED] High-stakes score tracking active.{RESET}"
             )
-            ticker_msg = "OPERATIVE MODE ENGAGED // Full challenge active."
             continue
 
         if input_lower.startswith("tree"):
@@ -1211,14 +1183,12 @@ def interactive_game_loop(
             else:
                 for tl in render_vfs_tree(node):
                     terminal_logs.append(tl)
-            ticker_msg = "DIRECTORY TREE // Filesystem hierarchy rendered."
             continue
 
         if input_lower.startswith("explain"):
             terminal_logs.append(f"{GREEN}operative@cybershell:{cwd_short}$ {user_input}{RESET}")
             for el in explain_command(user_input, active_obj):
                 terminal_logs.append(el)
-            ticker_msg = "COMMAND EXPLAINER // Breakdown displayed."
             continue
 
         if input_lower == "hint":
@@ -1226,60 +1196,30 @@ def interactive_game_loop(
             if not active_obj:
                 terminal_logs.append(f"{GREEN}All sector directives complete! No hint needed.{RESET}")
             else:
+                if hasattr(player, "use_hint"):
+                    player.use_hint()
                 h_msg, cost = get_progressive_hint(active_obj, hint_tier, cadet_mode)
                 if cost > 0:
                     dmg = player.take_damage(cost)
                     terminal_logs.append(f"{RED}⚡ Tactical Intel Decryption: -{dmg} HP{RESET}")
-                terminal_logs.append(f"{YELLOW}{BOLD}{h_msg}{RESET}")
+                terminal_logs.append(f"{YELLOW}{BOLD}💡 {h_msg}{RESET}")
                 hint_tier = min(3, hint_tier + 1)
-            ticker_msg = "TACTICAL HINT // Guidance displayed above."
             continue
 
-        if input_lower in ("help", "man"):
-            terminal_logs.append(f"{GREEN}operative@cybershell:{cwd_short}$ help{RESET}")
-            terminal_logs.append(f"{YELLOW}{BOLD}--- CYBERSHELL OPERATIVE COMMAND GUIDE ---{RESET}")
-            terminal_logs.append(f"  {WHITE}pwd{RESET}            : Print working directory coordinates.")
-            terminal_logs.append(f"  {WHITE}ls -la{RESET}         : Scan directory contents, hidden files, and file permissions.")
-            terminal_logs.append(f"  {WHITE}cd <path>{RESET}      : Navigate the mainframe directory tree.")
-            terminal_logs.append(f"  {WHITE}cat <file>{RESET}     : Read and display file contents.")
-            terminal_logs.append(f"  {WHITE}touch <file>{RESET}   : Create a new empty file or update timestamp.")
-            terminal_logs.append(f"  {WHITE}mkdir <dir>{RESET}    : Construct a new directory folder.")
-            terminal_logs.append(f"  {WHITE}chmod <mode>{RESET}   : Modify file permissions using octal notation (e.g. 755).")
-            terminal_logs.append(f"  {WHITE}grep <pattern>{RESET} : Search files for matching text patterns.")
-            terminal_logs.append(f"{CYAN}{BOLD}--- BEGINNER ASSIST TOOLS ---{RESET}")
-            terminal_logs.append(f"  {WHITE}tree [path]{RESET}    : Render a visual tree of directories and files.")
-            terminal_logs.append(f"  {WHITE}explain [cmd]{RESET}  : Educational breakdown of command syntax and arguments.")
-            terminal_logs.append(f"  {WHITE}hint{RESET}           : 3-tier progressive hint (Concept -> Syntax -> Exact answer).")
-            terminal_logs.append(f"  {WHITE}cadet{RESET}          : Enable Cadet mode (backlash damage waived).")
-            terminal_logs.append(f"  {WHITE}operative{RESET}      : Enable Operative mode (full -15 HP backlash challenge).")
-            terminal_logs.append(f"  {WHITE}save{RESET}           : Save progress checkpoint to ~/.cybershell_save.json.")
-            terminal_logs.append(f"  {WHITE}clear{RESET}          : Clear previous log entries from the terminal screen.")
-            terminal_logs.append(f"{CYAN}{BOLD}--- TACTICAL SHORTCUTS ---{RESET}")
-            terminal_logs.append(f"  {WHITE}menu (or 0){RESET}    : Return to Main Directory menu.")
-            terminal_logs.append(f"  {WHITE}codex (or 2){RESET}   : Open Hacker Codex tactical spellbook.")
-            terminal_logs.append(f"  {WHITE}items (or 3){RESET}   : View collected loot and hardware chips.")
-            terminal_logs.append(f"  {WHITE}map (or 4){RESET}     : View ASCII network map of all sectors.")
-            terminal_logs.append(f"  {WHITE}minigame (or 5){RESET}: Play Chmod Lockpicking puzzle for bonus XP.")
-            ticker_msg = "COMMAND GUIDE // Review available commands above."
-            continue
-
-        # Typo check before execution
+        # Check for typo or syntax suggestions before/after execution
         typo = check_typo_or_syntax(user_input)
-        if typo:
-            sugg, expl = typo
-            if cadet_mode:
-                terminal_logs.append(f"{YELLOW}💡 [TYPO COACH] You typed '{user_input}'. {expl}{RESET}")
-                terminal_logs.append(f"{CYAN}   Did you mean '{sugg}'? (Backlash waived in Cadet Mode){RESET}")
-            else:
-                terminal_logs.append(f"{YELLOW}💡 [TYPO COACH] Detected typo '{user_input}'. {expl}{RESET}")
-                terminal_logs.append(f"{CYAN}   Did you mean '{sugg}'?{RESET}")
 
         # Execute command in VFS
         terminal_logs.append(f"{GREEN}operative@cybershell:{cwd_short}$ {user_input}{RESET}")
         result = interpreter.execute(user_input)
 
+        if typo:
+            sugg, expl = typo
+            terminal_logs.append(f"{YELLOW}💡 [TYPO COACH] Detected '{user_input}'. Did you mean '{sugg}'? {expl}{RESET}")
+
         if result.stdout:
-            if user_input.split()[0] == "ls":
+            first_cmd = user_input.split()[0] if user_input.split() else ""
+            if first_cmd == "ls":
                 for out_line in colorize_ls_output(result.stdout):
                     terminal_logs.append(out_line)
             else:
@@ -1289,36 +1229,30 @@ def interactive_game_loop(
         if result.stderr:
             for err_line in result.stderr.splitlines():
                 terminal_logs.append(f"{RED}{err_line}{RESET}")
+            if not typo:
+                terminal_logs.append(f"{DIM}💡 Type 'help' or 'man <command>' for usage guidance.{RESET}")
 
-        # Combat backlash
-        if result.has_backlash:
-            if cadet_mode:
-                terminal_logs.append(
-                    f"{YELLOW}⚡ [CADET SHIELD] Backlash absorbed (0 HP lost). Review command syntax above or type 'hint'.{RESET}"
-                )
-                ticker_msg = "⚡ SYNTAX ERROR ABSORBED // Cadet mode protected you."
-            else:
-                dmg = player.take_damage(result.backlash_damage)
-                terminal_logs.append(
-                    f"{RED}{BOLD}⚡ ELECTRICAL BACKLASH! -{dmg} HP (Syntax Shock through mainframe wires){RESET}"
-                )
-                terminal_logs.append(f"{YELLOW}💡 Tip: Type 'explain' or 'help' to review valid Linux syntax.{RESET}")
-                ticker_msg = f"⚡ ELECTRICAL BACKLASH! -{dmg} HP // Check command syntax."
-        else:
-            ticker_msg = f"Command '{user_input.split()[0]}' executed successfully."
+        # In wargame mode, standard typos and exploration errors never deal electrical backlash HP damage
 
         # Objective evaluation
         old_level = player.level
+        old_badges = list(getattr(player, "badges", []))
         is_completed, newly_completed = evaluator.check_quest_progress(
             quest, vfs, player, last_command=user_input
         )
+
         if not result.stderr and result.exit_code == 0 and not newly_completed and not result.stdout:
             first_cmd = user_input.strip().split()[0] if user_input.strip() else ""
             if first_cmd in ("touch", "mkdir", "cd", "chmod", "cp", "mv", "rm"):
                 terminal_logs.append(f"{DIM}✓ Command '{first_cmd}' executed successfully.{RESET}")
+
+        # Check for newly awarded badges from exploration (e.g. Secret Hunter)
+        new_badges = [b for b in getattr(player, "badges", []) if b not in old_badges]
+        for nb in new_badges:
+            terminal_logs.append(f"{YELLOW}🏆 ACHIEVEMENT UNLOCKED: [{nb}]{RESET}")
+
         if newly_completed:
             hint_tier = 1
-            total_reward = 0
             for item in newly_completed:
                 if isinstance(item, str):
                     matched_obj = next((o for o in quest.objectives if o.id == item), None)
@@ -1327,9 +1261,18 @@ def interactive_game_loop(
                 else:
                     desc = item.description
                     reward = item.xp_reward
-                total_reward += reward
-                terminal_logs.append(f"{GREEN}{BOLD}🎯 DIRECTIVE ACCOMPLISHED! +{reward} XP: {desc}{RESET}")
-            ticker_msg = f"🎯 OBJECTIVE ACCOMPLISHED! +{total_reward} XP"
+
+                banner = get_access_granted_banner(
+                    title=desc[:46].upper(),
+                    xp_awarded=reward,
+                    streak=getattr(player, "streak", 0),
+                    badge=new_badges[0] if new_badges else None,
+                    width=min(width - 4, 60),
+                    styled=True,
+                )
+                for b_line in banner.splitlines():
+                    terminal_logs.append(b_line)
+
             save_game(player, cadet_mode)
 
             if is_completed:
@@ -1339,28 +1282,36 @@ def interactive_game_loop(
                     player.completed_sectors.add(quest.sector_id)
                 elif quest.sector_id not in player.completed_sectors:
                     player.completed_sectors.append(quest.sector_id)
-                terminal_logs.append(f"{MAGENTA}{BOLD}🏆 SECTOR {quest.sector_id} ({quest.sector_name}) FULLY LIBERATED!{RESET}")
+
+                terminal_logs.append(f"{MAGENTA}{BOLD}🏆 SECTOR {quest.sector_id} ({quest.sector_name.upper()}) FULLY LIBERATED!{RESET}")
                 if quest.reward_item:
                     terminal_logs.append(f"{YELLOW}🎁 LOOT ACQUIRED: {quest.reward_item.name} - {quest.reward_item.description}{RESET}")
-                    ticker_msg = f"🏆 SECTOR {quest.sector_id} LIBERATED! Loot: {quest.reward_item.name} (+{quest.reward_xp} XP)"
+
                 next_sector = player.current_sector + 1
                 if next_sector in all_quests:
                     player.current_sector = next_sector
                     quest = all_quests[next_sector]
+                    vfs.load_sector(next_sector, quest)
                     save_game(player, cadet_mode)
-                    terminal_logs.append(f"{CYAN}{BOLD}🚀 ADVANCING TO SECTOR {next_sector}: {quest.sector_name}!{RESET}")
-                    terminal_logs.append(f"{YELLOW}Handler {quest.npc_name} is establishing contact...{RESET}")
+
+                    unlock_banner = get_level_unlocked_banner(
+                        sector_num=next_sector,
+                        sector_name=quest.sector_name,
+                        width=min(width - 4, 60),
+                        styled=True,
+                    )
+                    for u_line in unlock_banner.splitlines():
+                        terminal_logs.append(u_line)
+                    terminal_logs.append(f"{YELLOW}Handler {quest.npc_name} incoming transmission: \"{quest.lore[:80]}...\"{RESET}")
                 else:
                     save_game(player, cadet_mode)
-                    terminal_logs.append(f"{MAGENTA}{BOLD}👑 VICTORY! ALL 6 SECTORS LIBERATED! MAINFRAME FREED FROM ROGUE DAEMONS!{RESET}")
-                    ticker_msg = "👑 VICTORY! ALL SECTORS LIBERATED! MAINFRAME SECURED!"
+                    for v_line in get_victory_banner(styled=True).splitlines():
+                        terminal_logs.append(v_line)
             elif quest.is_completed and quest.reward_item:
                 terminal_logs.append(f"{YELLOW}🎁 LOOT ACQUIRED: {quest.reward_item.name} - {quest.reward_item.description}{RESET}")
-                ticker_msg = f"🎁 LOOT ACQUIRED: {quest.reward_item.name}!"
 
         if player.level > old_level:
-            terminal_logs.append(f"{MAGENTA}{BOLD}🌟 PROMOTION! You leveled up to Level {player.level}! New Rank: {player.rank}{RESET}")
-            ticker_msg += f" 🌟 LEVEL UP! Rank: {player.rank}"
+            terminal_logs.append(f"{MAGENTA}{BOLD}🌟 PROMOTION! You reached Level {player.level}! New Rank: {player.rank}{RESET}")
 
 
 # =============================================================================

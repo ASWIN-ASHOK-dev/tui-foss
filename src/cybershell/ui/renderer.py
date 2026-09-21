@@ -174,6 +174,59 @@ def draw_double_header(
     )
 
 
+def draw_compact_hud(
+    character_name: str,
+    level_num: int,
+    sector_name: str,
+    xp: int,
+    streak: int = 0,
+    objective_desc: str = "",
+    hp: int = 100,
+    max_hp: int = 100,
+    width: int = 80,
+    styled: bool = True,
+) -> str:
+    """Render a compact 4-line terminal HUD for exploration gameplay."""
+    width = max(40, width)
+    inner_width = width - 2
+
+    streak_str = f" 🔥 {streak}" if streak > 1 else ""
+    if styled:
+        line_one = (
+            f"\033[1;96mOPERATIVE:\033[0m \033[1;97m{character_name}\033[0m  │  "
+            f"\033[1;92mHP:\033[0m \033[1;97m{hp}/{max_hp}\033[0m  │  "
+            f"\033[1;93mLEVEL {level_num:02d}: {sector_name.upper()}\033[0m  │  "
+            f"\033[1;95mXP:\033[0m \033[1;97m{xp}\033[0m"
+            f"\033[1;91m{streak_str}\033[0m"
+        )
+        line_two = f"\033[1;92m🎯 OBJECTIVE:\033[0m \033[1;97m{objective_desc}\033[0m"
+        b_col = "\033[96m"
+        b_rst = "\033[0m"
+    else:
+        line_one = (
+            f"OPERATIVE: {character_name}  |  "
+            f"HP: {hp}/{max_hp}  |  "
+            f"LEVEL {level_num:02d}: {sector_name.upper()}  |  "
+            f"XP: {xp}{streak_str}"
+        )
+        line_two = f"OBJECTIVE: {objective_desc}"
+        b_col = ""
+        b_rst = ""
+
+    line_one = pad_to_width(truncate_styled(line_one, inner_width), inner_width)
+    line_two = pad_to_width(truncate_styled(line_two, inner_width), inner_width)
+
+    return "\n".join(
+        [
+            b_col + TOP_LEFT + horizontal_line(inner_width) + TOP_RIGHT + b_rst,
+            b_col + VERTICAL + b_rst + line_one + b_col + VERTICAL + b_rst,
+            b_col + VERTICAL + b_rst + line_two + b_col + VERTICAL + b_rst,
+            b_col + BOTTOM_LEFT + horizontal_line(inner_width) + BOTTOM_RIGHT + b_rst,
+        ]
+    )
+
+
+
 def draw_panel(
     title: str,
     content: Iterable[str],
