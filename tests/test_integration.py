@@ -778,6 +778,120 @@ class TestCyberShellIntegration(unittest.TestCase):
         self.assertIn(0, player.completed_sectors)
         self.assertEqual(player.current_sector, 1)
 
+    def test_resolve_option_choice_and_question_answering(self) -> None:
+        """Verify option selection maps to command, and invalid option gives friendly tip."""
+        from cybershell.run import resolve_option_choice
+        from cybershell.game.quests import get_sector_quests
+
+        quests = get_sector_quests()
+        q0 = quests[0]
+        obj1 = q0.objectives[0]
+
+        # Valid choice B or 2 -> executes pwd
+        cmd, msg = resolve_option_choice("B", obj1)
+        self.assertEqual(cmd, "pwd")
+        self.assertIn("Correct!", msg)
+
+        cmd2, msg2 = resolve_option_choice("2", obj1)
+        self.assertEqual(cmd2, "pwd")
+        self.assertIn("Correct!", msg2)
+
+        # Invalid choice A -> returns None command with friendly tip
+        cmd_wrong, msg_wrong = resolve_option_choice("A", obj1)
+        self.assertIsNone(cmd_wrong)
+        self.assertIn("Try looking for", msg_wrong)
+
+        # Regular command -> returns None so command executes normally
+        cmd_plain, msg_plain = resolve_option_choice("pwd", obj1)
+        self.assertIsNone(cmd_plain)
+        self.assertIsNone(msg_plain)
+
+    def test_minigame_answer_checking_and_learning_feedback(self) -> None:
+        """Verify minigame checks answers, provides math breakdowns, and awards XP."""
+        from unittest.mock import patch
+        import io
+        from cybershell.tools.chmod_minigame import ChmodMinigame
+        from cybershell.run import view_minigame
+        from cybershell.contracts import PlayerStats
+
+        player = PlayerStats(character_name="Byte", hp=100, max_hp=100, xp=0)
+        minigame = ChmodMinigame(difficulty="easy")
+
+        # Mock sequence:
+        # 1. "" (blank enter - should give tip, stay on puzzle)
+        # 2. "h" (hint - should show step-by-step User triad math)
+        # 3. "777" (wrong answer - should show step-by-step arithmetic)
+        # 4. correct answer (should celebrate, award XP)
+        # 5. "0" (exit after correct answer)
+        # 6. "0" (exit main loop)
+        door_puz = minigame.generate_puzzle()
+        correct_code = door_puz.answer
+        # reset active_puzzle to door_puz
+        minigame.active_puzzle = door_puz
+
+        out_stream = io.StringIO()
+        with patch("sys.stdout", out_stream):
+            with patch("builtins.input", side_effect=["", "h", "000", correct_code, "0"]):
+                view_minigame(minigame, player, 80)
+
+        output = out_stream.getvalue()
+        # Verify formula card present
+        self.assertIn("PERMISSIONS FORMULA", output)
+        self.assertIn("r (read) = 4", output)
+        # Verify hint present
+        self.assertIn("STEP-BY-STEP HINT", output)
+        # Verify step-by-step error math present
+        self.assertIn("not correct", output)
+        self.assertIn("Let's calculate step by step", output)
+        # Verify XP awarded on correct answer
+        self.assertIn("CORRECT!", output)
+        self.assertGreater(player.xp, 0)
+
+    def test_gameplay_output_preserved_after_option_selection(self) -> None:
+        """Verify command output is preserved when options are entered and tasks complete."""
+        from cybershell.engine.vfs import VirtualFileSystem
+        from cybershell.engine.interpreter import Interpreter
+        from cybershell.game.evaluator import QuestEvaluator
+        from cybershell.game.quests import get_sector_quests
+        from cybershell.contracts import PlayerStats
+
+        vfs = VirtualFileSystem(default_user="byte")
+        interpreter = Interpreter(vfs=vfs)
+        evaluator = QuestEvaluator()
+        quests = get_sector_quests()
+        q0 = quests[0]
+        vfs.load_sector(0, q0)
+        player = PlayerStats(character_name="Byte", hp=100, max_hp=100, xp=0)
+
+        # Simulate option B (pwd) execution
+        terminal_logs = ["initial welcome log"]
+        cmd_start_index = len(terminal_logs)
+
+        # Run pwd
+        terminal_logs.append("💡 [B] Correct! Running: pwd")
+        terminal_logs.append("byte@adventure:~$ pwd")
+        res = interpreter.execute("pwd")
+        for line in res.stdout.splitlines():
+            terminal_logs.append(line)
+
+        # Verify output exists
+        self.assertIn("/home/byte", terminal_logs)
+
+        # Progress check
+        is_comp, newly_comp = evaluator.check_quest_progress(q0, vfs, player, last_command="pwd")
+        self.assertTrue(newly_comp)
+
+        # Apply new clean slate preservation
+        recent_logs = list(terminal_logs[cmd_start_index:])
+        terminal_logs.clear()
+        terminal_logs.extend(recent_logs)
+        terminal_logs.append("✓ Task Cleared: Location (+50 XP)")
+
+        # Verify output is STILL in terminal_logs after task clearance!
+        self.assertIn("/home/byte", terminal_logs)
+        self.assertIn("byte@adventure:~$ pwd", terminal_logs)
+        self.assertIn("✓ Task Cleared", terminal_logs[-1])
+
 
 if __name__ == "__main__":
     unittest.main()

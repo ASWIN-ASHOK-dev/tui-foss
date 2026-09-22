@@ -19,7 +19,7 @@ SRC_DIR = os.path.join(PROJECT_ROOT, "src")
 if SRC_DIR not in sys.path:
     sys.path.insert(0, SRC_DIR)
 
-from cybershell.contracts import UIProtocol
+from cybershell.contracts import Item, PlayerStats, UIProtocol
 from cybershell.ui.ascii_art import (
     ADVENTURE_LOGO,
     ADVENTURE_LOGO_COMPACT,
@@ -42,7 +42,9 @@ from cybershell.ui.renderer import (
     draw_compact_hud,
     draw_control_footer,
     draw_double_header,
+    draw_field_manual_card,
     draw_panel,
+    draw_question_card,
     draw_split_panels,
     pad_to_width,
     truncate_styled,
@@ -124,6 +126,34 @@ class TestASCIIArt(unittest.TestCase):
         # Styled banners preserve clean text
         self.assertEqual(strip_ansi(get_victory_banner(styled=True)), VICTORY_BANNER)
         self.assertEqual(strip_ansi(get_defeat_banner(styled=True)), DEFEAT_BANNER)
+
+    def test_draw_question_card_rendering(self) -> None:
+        """Verify draw_question_card formats within 80 columns without clipping."""
+        card = draw_question_card(
+            question_num=1,
+            total_questions=2,
+            question_text="Which Linux command displays your current working directory path?",
+            options=[
+                "ls       - List files in current folder",
+                "pwd      - Print working directory path",
+                "cd       - Change current directory",
+                "whoami   - Display current logged in user",
+            ],
+            scenario="You just opened a terminal in a new system.",
+            width=80,
+            styled=True,
+        )
+        self.assertIn("QUESTION 1/2", card)
+        self.assertIn("[A]", card)
+        self.assertIn("[B]", card)
+        self.assertIn("[C]", card)
+        self.assertIn("[D]", card)
+        self.assertIn("pwd", card)
+        for line in card.splitlines():
+            self.assertLessEqual(visual_len(line), 80, f"Question card line exceeded 80 cols: {line}")
+
+        # Empty returns empty string
+        self.assertEqual(draw_question_card(question_text="", options=[]), "")
 
 
 class TestTerminalBufferWidget(unittest.TestCase):
@@ -266,6 +296,138 @@ class TestRPGAppGauthamIntegration(unittest.TestCase):
 
         defeat = self.app.render_defeat(80)
         self.assertIn("Mistakes are a great way to learn!", defeat)
+
+    def test_field_manual_card_dimensions_and_visibility(self) -> None:
+        """Field manual card must be strictly <= 16 lines and <= 80 chars wide on all pages."""
+        # Page 1: Rules
+        card_p1 = draw_field_manual_card(page=1, width=80, styled=False)
+        lines_p1 = card_p1.splitlines()
+        self.assertLessEqual(len(lines_p1), 16, f"Page 1 has {len(lines_p1)} lines, expected <= 16")
+        for line in lines_p1:
+            self.assertLessEqual(visual_len(line), 80, f"Page 1 line exceeded 80 cols: {line}")
+        self.assertIn("15 Levels", card_p1)
+        self.assertIn("Real Shell", card_p1)
+        self.assertIn("ZERO damage", card_p1)
+        self.assertIn("Easy Hints", card_p1)
+        self.assertIn("Progress Map", card_p1)
+        self.assertIn("Main Menu", card_p1)
+        self.assertIn("Byte", card_p1)
+
+        # Page 2: Commands
+        card_p2 = draw_field_manual_card(page=2, width=80, styled=False)
+        lines_p2 = card_p2.splitlines()
+        self.assertLessEqual(len(lines_p2), 16, f"Page 2 has {len(lines_p2)} lines, expected <= 16")
+        for line in lines_p2:
+            self.assertLessEqual(visual_len(line), 80, f"Page 2 line exceeded 80 cols: {line}")
+        self.assertIn("pwd", card_p2)
+        self.assertIn("cd", card_p2)
+        self.assertIn("cat", card_p2)
+        self.assertIn("grep", card_p2)
+
+    def test_render_manual_visibility(self) -> None:
+        """RPGApp.render_manual must fit standard frames without clipping."""
+        manual = self.app.render_manual(80)
+        lines = manual.splitlines()
+        self.assertLessEqual(len(lines), 16)
+        for line in lines:
+            self.assertLessEqual(visual_len(line), 80, f"Manual line clipped: {line}")
+        self.assertIn("FIELD MANUAL & RULES", manual)
+
+    def test_draw_double_header_dimensions(self) -> None:
+        """Verify draw_double_header renders within exact specified width."""
+        header = draw_double_header(
+            character_name="Byte",
+            hp=100,
+            max_hp=100,
+            xp=150,
+            sector_title="ADVENTURE MAP",
+            width=74,
+            styled=True,
+        )
+        lines = header.splitlines()
+        self.assertEqual(len(lines), 4)
+        for line in lines:
+            self.assertEqual(visual_len(line), 74)
+        self.assertIn("BYTE'S LINUX ADVENTURE", header)
+        self.assertIn("150 XP", header)
+        self.assertIn("ADVENTURE MAP", header)
+
+    def test_view_field_manual_navigation(self) -> None:
+        """view_field_manual must support page progression and exit cleanly."""
+        from unittest.mock import patch
+        from cybershell.run import view_field_manual
+
+        # Press Enter on page 1 -> moves to page 2 -> press Enter on page 2 -> exits
+        with patch("builtins.input", side_effect=["", ""]):
+            with patch("sys.stdout"):
+                view_field_manual(80)
+
+        # Type '0' on page 1 -> exits immediately
+        with patch("builtins.input", side_effect=["0"]):
+            with patch("sys.stdout"):
+                view_field_manual(80)
+
+    def test_view_codex_navigation(self) -> None:
+        """view_codex allows searching commands and exits cleanly."""
+        from io import StringIO
+        from unittest.mock import patch
+        from cybershell.run import view_codex
+        from cybershell.tools.codex import Codex
+
+        codex = Codex()
+        player = PlayerStats(character_name="Byte", hp=100, max_hp=100, xp=50)
+
+        # Search for pwd, then press Enter to return, then 0 to exit
+        buf = StringIO()
+        with patch("builtins.input", side_effect=["pwd", "", "0"]):
+            with patch("sys.stdout", buf):
+                view_codex(codex, player, 80)
+        output = buf.getvalue()
+        self.assertIn("LINUX COMMAND GUIDE", output)
+        self.assertIn("GUIDE: PWD", output)
+
+    def test_view_inventory_rendering(self) -> None:
+        """view_inventory displays backpack items and badges without errors."""
+        from io import StringIO
+        from unittest.mock import patch
+        from cybershell.run import view_inventory
+
+        player = PlayerStats(character_name="Byte", hp=100, max_hp=100, xp=100)
+        player.inventory.append(
+            Item(id="star_1", name="Gold Star", description="A shiny star", rarity="legendary")
+        )
+        player.badges.append("Scout Badge")
+
+        buf = StringIO()
+        with patch("builtins.input", side_effect=[""]):
+            with patch("sys.stdout", buf):
+                view_inventory(player, 80)
+        output = buf.getvalue()
+        self.assertIn("YOUR BACKPACK & GOODIES", output)
+        self.assertIn("Gold Star", output)
+        self.assertIn("Scout Badge", output)
+
+    def test_view_map_rendering(self) -> None:
+        """view_map displays 15 levels and exits on Enter."""
+        from io import StringIO
+        from unittest.mock import patch
+        from cybershell.run import view_map
+        from cybershell.tools.map import MainframeMap
+        from cybershell.game.quests import get_sector_quests
+
+        player = PlayerStats(character_name="Byte", hp=100, max_hp=100, xp=100, current_sector=1)
+        player.completed_sectors.append(0)
+        mainframe = MainframeMap()
+        quests = get_sector_quests()
+
+        buf = StringIO()
+        with patch("builtins.input", side_effect=[""]):
+            with patch("sys.stdout", buf):
+                view_map(mainframe, player, quests, 80)
+        output = buf.getvalue()
+        self.assertIn("ADVENTURE MAP (15 LEVELS)", output)
+        self.assertIn("Completed", output)
+        self.assertIn("Current", output)
 
 
 if __name__ == "__main__":

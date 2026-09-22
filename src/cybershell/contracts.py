@@ -95,6 +95,9 @@ class Objective:
     xp_reward: int = 50
     hints: List[str] = field(default_factory=list)
     scenario: str = ""
+    question: str = ""
+    options: List[str] = field(default_factory=list)
+    correct_option: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialize objective to a dictionary."""
@@ -117,6 +120,9 @@ class Objective:
             xp_reward=int(data.get("xp_reward", 50)),
             hints=list(data.get("hints", [])),
             scenario=str(data.get("scenario", "")),
+            question=str(data.get("question", "")),
+            options=list(data.get("options", [])),
+            correct_option=str(data.get("correct_option", "")),
         )
 
 

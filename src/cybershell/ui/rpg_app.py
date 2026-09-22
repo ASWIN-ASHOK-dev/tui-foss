@@ -34,6 +34,7 @@ from .ascii_art import (
 )
 from .renderer import (
     draw_double_header,
+    draw_field_manual_card,
     draw_panel,
     draw_split_panels,
     terminal_size,
@@ -316,7 +317,7 @@ class RPGApp:
                 f"GUIDE: [{npc.upper()}]",
                 "Status: EXPLORING 🌱",
             ] + portrait + [
-                "Objective: Type 'pwd' to look around",
+                "Objective: Solve challenge questions",
                 "Progress: 0/15 Levels",
             ]
 
@@ -448,23 +449,9 @@ class RPGApp:
         panel_lines = draw_panel("BACKPACK", content, width - 4)
         return header + "\n" + "\n".join(panel_lines)
 
-    def render_manual(self, width: int = 80) -> str:
+    def render_manual(self, width: int = 80, page: int = 1, styled: bool = False) -> str:
         """Render the Field Manual & Rules screen."""
-        lines = [
-            FIELD_MANUAL_HEADER,
-            "Welcome to Byte's Linux Adventure! 🌱",
-            "",
-            "• Exactly 15 bite-sized levels teaching real Linux skills.",
-            "• Each level has 1-2 friendly goals.",
-            "• Type Linux commands at the prompt (e.g. 'pwd', 'ls', 'cat').",
-            "• Mistakes deal ZERO damage! Explore freely and learn.",
-            "• Need a hint? Type '?' or 'hint' anytime.",
-            "• Want to see all levels? Type 'map'.",
-            "",
-            "Press Enter to return to the adventure!",
-        ]
-        panel = draw_panel("FIELD MANUAL & RULES", lines, width - 4)
-        return "\n".join(panel)
+        return draw_field_manual_card(page=page, width=width, styled=styled)
 
     def render(self) -> str:
         """Render the currently active screen."""

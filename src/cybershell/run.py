@@ -74,10 +74,20 @@ from cybershell.ui.ascii_art import (
     get_victory_banner,
 )
 from cybershell.ui.renderer import (
+    PANEL_BOTTOM_LEFT,
+    PANEL_BOTTOM_RIGHT,
+    PANEL_DIVIDER_LEFT,
+    PANEL_DIVIDER_RIGHT,
+    PANEL_HORIZONTAL,
+    PANEL_TOP_LEFT,
+    PANEL_TOP_RIGHT,
+    PANEL_VERTICAL,
     draw_compact_hud,
     draw_control_footer,
     draw_double_header,
+    draw_field_manual_card,
     draw_panel,
+    draw_question_card,
     draw_split_panels,
     pad_to_width,
     terminal_size,
@@ -636,23 +646,8 @@ def render_opening_screen(
 def show_mandatory_field_manual(width: int = 80) -> None:
     """Display the short, mandatory Field Manual & Rules screen on first launch."""
     sys.stdout.write("\033[H\033[J")
-    header_art = FIELD_MANUAL_HEADER.strip("\n")
-    print(f"{GREEN}{header_art}{RESET}\n")
-
-    rules = [
-        "Welcome to your Linux Adventure! Here are your simple rules:",
-        "",
-        "🌱 1. Exactly 15 Levels: A finite journey from 'pwd' to powerful pipes.",
-        "🌱 2. Real Commands: Type real Linux commands (pwd, ls, cd, cat, grep, chmod).",
-        "🌱 3. 100% Safe: Mistakes deal ZERO damage! Explore freely and try things out.",
-        "🌱 4. Helpful Guidance: Type '?' or 'hint' anytime if you need a clue.",
-        "🌱 5. Progress Map: Type 'map' anytime to see your adventure progress.",
-        "🌱 6. Main Menu: Type 'menu' or press ESC to safely return to the main menu.",
-        "",
-        "Ready to begin? Your very first task is waiting for you!",
-    ]
-    card = draw_panel("📖 FIELD MANUAL & RULES", rules, min(width - 4, 72), styled=True)
-    for line in card:
+    card = draw_field_manual_card(page=1, width=width, styled=True)
+    for line in card.splitlines():
         print(f"  {line}")
     print()
     try:
@@ -667,6 +662,7 @@ def show_mandatory_field_manual(width: int = 80) -> None:
 
 def view_codex(codex: Codex, player: PlayerStats, width: int) -> None:
     """Display the friendly command guide with search capability."""
+    card_w = min(max(40, width - 4), 74)
     while True:
         sys.stdout.write("\033[H\033[J")
         header = draw_double_header(
@@ -675,17 +671,18 @@ def view_codex(codex: Codex, player: PlayerStats, width: int) -> None:
             player.max_hp,
             player.xp,
             "COMMAND GUIDE",
-            width,
+            card_w,
             styled=True,
         )
-        print(header)
+        for h_line in header.splitlines():
+            print(f"  {h_line}")
         print()
         print(f"  {GREEN}{BOLD}[ 🌱 LINUX COMMAND GUIDE ]{RESET}")
         desc = (
             "Browse handy Linux commands or search for what you want to do. "
             "Type a command name (e.g. 'cat', 'ls', 'grep', 'chmod') to see how it works!"
         )
-        for line in textwrap.wrap(desc, width=width - 4):
+        for line in textwrap.wrap(desc, width=card_w - 4):
             print(f"  {WHITE}{line}{RESET}")
         print()
         print(f"  {CYAN}{BOLD}AVAILABLE COMMANDS:{RESET}")
@@ -696,7 +693,7 @@ def view_codex(codex: Codex, player: PlayerStats, width: int) -> None:
             formatted = "    ".join(f"{GREEN}{cmd:<8}{RESET}" for cmd in chunk)
             print(f"    {formatted}")
         print()
-        print(f"  {DIM}{'─' * (width - 4)}{RESET}")
+        print(f"  {DIM}{'─' * card_w}{RESET}")
         try:
             term = input(
                 f"  {YELLOW}Enter command or keyword (or press Enter / '0' to return to menu): {RESET}"
@@ -736,6 +733,7 @@ def view_codex(codex: Codex, player: PlayerStats, width: int) -> None:
 
 def view_inventory(player: PlayerStats, width: int) -> None:
     """Display the player's backpack and collected goodies."""
+    card_w = min(max(40, width - 4), 74)
     sys.stdout.write("\033[H\033[J")
     header = draw_double_header(
         player.character_name,
@@ -743,14 +741,15 @@ def view_inventory(player: PlayerStats, width: int) -> None:
         player.max_hp,
         player.xp,
         "BACKPACK & ITEMS",
-        width,
+        card_w,
         styled=True,
     )
-    print(header)
+    for h_line in header.splitlines():
+        print(f"  {h_line}")
     print()
     print(f"  {YELLOW}{BOLD}[ 🎒 YOUR BACKPACK & GOODIES ]{RESET}")
     desc = "Special items, stars, and badges collected during your Linux journey."
-    for line in textwrap.wrap(desc, width=width - 4):
+    for line in textwrap.wrap(desc, width=card_w - 4):
         print(f"  {WHITE}{line}{RESET}")
     print()
     if not player.inventory:
@@ -769,7 +768,7 @@ def view_inventory(player: PlayerStats, width: int) -> None:
         for b in raw_badges:
             print(f"    🏆 {b}")
 
-    print(f"\n  {DIM}{'─' * (width - 4)}{RESET}")
+    print(f"\n  {DIM}{'─' * card_w}{RESET}")
     try:
         input(f"  {YELLOW}Press Enter to return to Main Menu...{RESET}")
     except (KeyboardInterrupt, EOFError):
@@ -778,6 +777,7 @@ def view_inventory(player: PlayerStats, width: int) -> None:
 
 def view_map(mainframe: MainframeMap, player: PlayerStats, all_quests: Dict[int, Quest], width: int) -> None:
     """Display the friendly 15-level Adventure Map."""
+    card_w = min(max(40, width - 4), 74)
     sys.stdout.write("\033[H\033[J")
     header = draw_double_header(
         player.character_name,
@@ -785,13 +785,15 @@ def view_map(mainframe: MainframeMap, player: PlayerStats, all_quests: Dict[int,
         player.max_hp,
         player.xp,
         "ADVENTURE MAP (15 LEVELS)",
-        width,
+        card_w,
         styled=True,
     )
-    print(header)
+    for h_line in header.splitlines():
+        print(f"  {h_line}")
     print()
-    print(render_adventure_map(player, all_quests))
-    print(f"\n  {DIM}{'─' * (width - 4)}{RESET}")
+    for m_line in render_adventure_map(player, all_quests, width=card_w).splitlines():
+        print(f"  {m_line}")
+    print(f"\n  {DIM}{'─' * card_w}{RESET}")
     try:
         input(f"  {YELLOW}Press Enter to return to Main Menu...{RESET}")
     except (KeyboardInterrupt, EOFError):
@@ -799,8 +801,13 @@ def view_map(mainframe: MainframeMap, player: PlayerStats, all_quests: Dict[int,
 
 
 def view_minigame(minigame: ChmodMinigame, player: PlayerStats, width: int) -> None:
-    """Run the interactive Chmod Permissions Minigame for bonus XP."""
+    """Run the interactive Chmod Permissions Minigame with learning lab and answer validation."""
     minigame.set_player(player)
+    puzzle = minigame.active_puzzle or minigame.generate_puzzle()
+    feedback: List[str] = []
+
+    card_w = min(max(40, width - 4), 74)
+
     while True:
         sys.stdout.write("\033[H\033[J")
         header = draw_double_header(
@@ -808,119 +815,231 @@ def view_minigame(minigame: ChmodMinigame, player: PlayerStats, width: int) -> N
             player.hp,
             player.max_hp,
             player.xp,
-            "PERMISSIONS PUZZLE // CHMOD",
-            width,
+            "PERMISSIONS PUZZLE & LEARNING LAB",
+            card_w,
             styled=True,
         )
-        print(header)
+        for h_line in header.splitlines():
+            print(f"  {h_line}")
         print()
-        print(f"  {YELLOW}{BOLD}[ PERMISSIONS PUZZLE ]{RESET}")
-        desc = (
-            "Practice converting Unix permission strings into 3-digit octal codes (e.g. rwxr-xr-x = 755). "
-            "Solve puzzles to earn bonus XP and sharpen your chmod skills!"
-        )
-        for line in textwrap.wrap(desc, width=width - 4):
-            print(f"  {WHITE}{line}{RESET}")
+
+        # Permissions Learning Reference Card (compact 3 lines)
+        print(f"  {YELLOW}{BOLD}[ 📖 PERMISSIONS FORMULA ]{RESET}")
+        print(f"  {WHITE}Triads : {GREEN}[User/Owner]{WHITE} {CYAN}[Group]{WHITE} {MAGENTA}[Others]{RESET}")
+        print(f"  {WHITE}Values : {BOLD}r (read) = 4{RESET}  |  {BOLD}w (write) = 2{RESET}  |  {BOLD}x (execute) = 1{RESET}  |  {DIM}- = 0{RESET}")
+        print(f"  {DIM}Example: rwxr-xr-x -> User: 4+2+1=7 | Group: 4+0+1=5 | Others: 4+0+1=5  =>  755{RESET}")
         print()
-        puzzle = minigame.generate_puzzle()
-        door_lines = minigame.render_door().splitlines()
-        for d_line in door_lines:
-            print(f"  {d_line}")
+
+        # Current Puzzle Card
+        u_sym = puzzle.permission[0:3]
+        g_sym = puzzle.permission[3:6]
+        o_sym = puzzle.permission[6:9]
+
+        inner_w = card_w - 2
+        p_top = f"\033[92m{PANEL_TOP_LEFT}{PANEL_HORIZONTAL * inner_w}{PANEL_TOP_RIGHT}\033[0m"
+        p_bot = f"\033[92m{PANEL_BOTTOM_LEFT}{PANEL_HORIZONTAL * inner_w}{PANEL_BOTTOM_RIGHT}\033[0m"
+        p_div = f"\033[92m{PANEL_DIVIDER_LEFT}{PANEL_HORIZONTAL * inner_w}{PANEL_DIVIDER_RIGHT}\033[0m"
+
+        def p_row(styled_content: str) -> str:
+            pad = max(0, inner_w - visual_len(styled_content))
+            return f"\033[92m{PANEL_VERTICAL}\033[0m{styled_content}{' ' * pad}\033[92m{PANEL_VERTICAL}\033[0m"
+
+        p_lines = [
+            f"  {p_top}",
+            f"  {p_row(f'  {YELLOW}{BOLD}🚪 PUZZLE #{puzzle.door_number:02d} • Convert to 3-Digit Octal Code{RESET}')}",
+            f"  {p_div}",
+            f"  {p_row(f'  Symbolic Pattern : {BOLD}{WHITE}{puzzle.permission}{RESET}')}",
+            f"  {p_row(f'    • {GREEN}User   (u){RESET}   : {WHITE}{u_sym}{RESET}   (r=4, w=2, x=1, -=0)')}",
+            f"  {p_row(f'    • {CYAN}Group  (g){RESET}   : {WHITE}{g_sym}{RESET}   (r=4, w=2, x=1, -=0)')}",
+            f"  {p_row(f'    • {MAGENTA}Others (o){RESET}   : {WHITE}{o_sym}{RESET}   (r=4, w=2, x=1, -=0)')}",
+            f"  {p_bot}",
+        ]
+        for pl in p_lines:
+            print(pl)
         print()
+
+        if feedback:
+            for fb in feedback:
+                print(fb)
+            print()
+
         try:
             guess = input(
-                f"  {YELLOW}Enter 3-digit octal code for '{puzzle.permission}' (or 'q' to return to menu): {RESET}"
+                f"  {YELLOW}{BOLD}Enter 3-digit code (e.g. 755) ['h'=hint, 'n'=next, '0'=exit]: {RESET}"
             ).strip()
         except (KeyboardInterrupt, EOFError):
             break
 
-        if not guess or guess.lower() in ("q", "quit", "0", "exit", "back", "menu"):
+        guess_lower = guess.lower()
+        if guess_lower in ("0", "q", "quit", "exit", "menu", "back"):
             break
+
+        if not guess:
+            feedback = [
+                f"  {YELLOW}💡 Enter a 3-digit octal number (like 755 or 644) to test your answer!{RESET}",
+                f"  {DIM}Type 'h' for a hint, 'n' to skip to next puzzle, or '0' to exit.{RESET}",
+            ]
+            continue
+
+        if guess_lower in ("h", "hint", "?"):
+            u_r = 4 if u_sym[0] == "r" else 0
+            u_w = 2 if u_sym[1] == "w" else 0
+            u_x = 1 if u_sym[2] == "x" else 0
+            u_val = u_r + u_w + u_x
+            feedback = [
+                f"  {CYAN}{BOLD}💡 STEP-BY-STEP HINT:{RESET}",
+                f"     1. User '{u_sym}' has values {u_r} + {u_w} + {u_x} = {BOLD}{u_val}{RESET} (1st digit).",
+                f"     2. Next calculate Group '{g_sym}' and Others '{o_sym}' the same way!",
+            ]
+            continue
+
+        if guess_lower in ("n", "next", "skip"):
+            feedback = [
+                f"  {DIM}Skipped puzzle #{puzzle.door_number:02d}. The correct code was {puzzle.answer}.{RESET}"
+            ]
+            puzzle = minigame.generate_puzzle()
+            continue
 
         result = minigame.validate_answer(guess)
         if result.correct:
-            print(f"\n  {GREEN}{BOLD}{result.message}{RESET}")
+            u_val = (4 if u_sym[0] == "r" else 0) + (2 if u_sym[1] == "w" else 0) + (1 if u_sym[2] == "x" else 0)
+            g_val = (4 if g_sym[0] == "r" else 0) + (2 if g_sym[1] == "w" else 0) + (1 if g_sym[2] == "x" else 0)
+            o_val = (4 if o_sym[0] == "r" else 0) + (2 if o_sym[1] == "w" else 0) + (1 if o_sym[2] == "x" else 0)
+
+            # Redraw screen with success celebration
+            sys.stdout.write("\033[H\033[J")
+            for h_line in header.splitlines():
+                print(f"  {h_line}")
+            print()
+            for rl in [
+                f"  {YELLOW}{BOLD}[ 📖 PERMISSIONS FORMULA ]{RESET}",
+                f"  {WHITE}Triads : {GREEN}[User/Owner]{WHITE} {CYAN}[Group]{WHITE} {MAGENTA}[Others]{RESET}",
+                f"  {WHITE}Values : {BOLD}r (read) = 4{RESET}  |  {BOLD}w (write) = 2{RESET}  |  {BOLD}x (execute) = 1{RESET}  |  {DIM}- = 0{RESET}",
+                f"  {DIM}Example: rwxr-xr-x -> User: 4+2+1=7 | Group: 4+0+1=5 | Others: 4+0+1=5  =>  755{RESET}",
+            ]:
+                print(rl)
+            print()
+            for pl in p_lines:
+                print(pl)
+            print()
+            print(f"  {GREEN}{BOLD}🎉 CORRECT! {puzzle.permission} = {puzzle.answer}!{RESET}")
+            print(f"  {GREEN}   Breakdown: User={u_val} ({u_sym}), Group={g_val} ({g_sym}), Others={o_val} ({o_sym}){RESET}")
             if result.xp_awarded > 0:
-                print(f"  {GREEN}🎉 +{result.xp_awarded} XP awarded to {player.character_name}! Current XP: {player.xp}{RESET}")
+                print(f"  {YELLOW}⭐ +{result.xp_awarded} XP awarded to {player.character_name}! Total XP: {player.xp}{RESET}")
+            print()
             try:
-                input(f"\n  {YELLOW}Press Enter for next puzzle...{RESET}")
+                nxt = input(f"  {YELLOW}[ Press Enter for next puzzle, or 0 to exit ]{RESET} ").strip()
+                if nxt in ("0", "q", "quit", "exit", "menu"):
+                    break
             except (KeyboardInterrupt, EOFError):
                 break
+            feedback = [f"  {GREEN}✓ Solved puzzle #{puzzle.door_number:02d}! Here is your next puzzle:{RESET}"]
+            puzzle = minigame.generate_puzzle()
         else:
-            print(f"\n  {RED}{BOLD}{result.message}{RESET}")
-            try:
-                input(f"\n  {YELLOW}Press Enter to try another puzzle...{RESET}")
-            except (KeyboardInterrupt, EOFError):
-                break
+            u_r = 4 if u_sym[0] == "r" else 0
+            u_w = 2 if u_sym[1] == "w" else 0
+            u_x = 1 if u_sym[2] == "x" else 0
+            u_val = u_r + u_w + u_x
+
+            g_r = 4 if g_sym[0] == "r" else 0
+            g_w = 2 if g_sym[1] == "w" else 0
+            g_x = 1 if g_sym[2] == "x" else 0
+            g_val = g_r + g_w + g_x
+
+            o_r = 4 if o_sym[0] == "r" else 0
+            o_w = 2 if o_sym[1] == "w" else 0
+            o_x = 1 if o_sym[2] == "x" else 0
+            o_val = o_r + o_w + o_x
+
+            feedback = [
+                f"  {RED}{BOLD}❌ '{guess}' is not correct for '{puzzle.permission}'.{RESET}",
+                f"  {YELLOW}Let's calculate step by step:{RESET}",
+                f"    • {GREEN}User   '{u_sym}'{RESET} : {u_r} + {u_w} + {u_x} = {BOLD}{u_val}{RESET}",
+                f"    • {CYAN}Group  '{g_sym}'{RESET} : {g_r} + {g_w} + {g_x} = {BOLD}{g_val}{RESET}",
+                f"    • {MAGENTA}Others '{o_sym}'{RESET} : {o_r} + {o_w} + {o_x} = {BOLD}{o_val}{RESET}",
+                f"  {WHITE}The matching code is {BOLD}{puzzle.answer}{RESET}.",
+                f"  {DIM}Type the correct code, or press 'n' for a new puzzle, or '0' to exit.{RESET}",
+            ]
 
 
 def view_field_manual(width: int) -> None:
-    """Display the Field Manual & Rules screen."""
-    sys.stdout.write("\033[H\033[J")
-    header = draw_double_header(
-        "BYTE",
-        100,
-        100,
-        0,
-        "FIELD MANUAL & RULES",
-        width,
-        styled=True,
-    )
-    print(header)
-    print()
-    sections = [
-        ("ABOUT THE ADVENTURE", [
-            "Byte's Linux Adventure is a friendly terminal journey through Linux basics.",
-            "There are exactly 15 levels. Each level teaches or tests one essential concept.",
-            "Complete levels by typing real Linux commands at the prompt.",
-        ]),
-        ("ZERO PENALTIES", [
-            "Mistakes deal ZERO damage! There are no health bars or sudden game overs.",
-            "If you make a typo, Byte gives you a friendly coaching tip. Try as many times as you like!",
-        ]),
-        ("HELP & HINTS", [
-            "? or hint        - Progressive 3-tier clues (Concept -> Pattern -> Exact solution).",
-            "map              - Visual progress map across all 15 levels.",
-            "man <command>    - Friendly guide for any command (e.g. 'man ls').",
-            "explain <cmd>    - Syntax breakdown for a command.",
-            "tree             - Visual folder tree.",
-            "Tab key          - Auto-complete commands and file names.",
-        ]),
-        ("ESSENTIAL COMMANDS", [
-            "pwd            - Find out what folder you are currently in.",
-            "ls, ls -a      - See files in your folder (including hidden ones).",
-            "cd <folder>    - Move into a folder ('cd ..' to go up).",
-            "cat <file>     - Read a text file.",
-            "grep <word>    - Find a word inside files.",
-            "chmod <mode>   - Change permissions on files (e.g. 755 or +x).",
-            "wc -l / sort   - Count lines and sort text.",
-            "Pipes (|)      - Send output of one command into another.",
-            "> and >>       - Direct output into files.",
-        ]),
-        ("NAVIGATION", [
-            "menu (or 0)    - Return safely to the Main Menu.",
-            "map            - Open the Adventure Map.",
-            "codex          - Open the Command Guide.",
-            "items          - View backpack and badges.",
-            "clear          - Clear terminal screen.",
-        ]),
-    ]
-    for sec_title, sec_lines in sections:
-        print(f"  {GREEN}{BOLD}[ {sec_title} ]{RESET}")
-        for line in sec_lines:
-            for w in textwrap.wrap(line, width=width - 6):
-                print(f"    {WHITE}{w}{RESET}")
+    """Display the Field Manual & Rules screen with compact 2-page navigation."""
+    page = 1
+    while True:
+        sys.stdout.write("\033[H\033[J")
+        card = draw_field_manual_card(page=page, width=width, styled=True)
+        for line in card.splitlines():
+            print(f"  {line}")
         print()
-    print(f"  {DIM}{'─' * (width - 4)}{RESET}")
-    try:
-        input(f"  {YELLOW}Press Enter to return to Main Menu...{RESET}")
-    except (KeyboardInterrupt, EOFError):
-        pass
+        if page == 1:
+            prompt = f"  {YELLOW}{BOLD}[ Enter: Next Page (Commands) | 0 or q: Main Menu ]{RESET} "
+        else:
+            prompt = f"  {YELLOW}{BOLD}[ Enter: Main Menu | 1: Page 1 (Rules) | 0 or q: Main Menu ]{RESET} "
+        try:
+            choice = input(prompt).strip().lower()
+        except (KeyboardInterrupt, EOFError):
+            break
+
+        if choice in ("0", "q", "quit", "exit", "menu"):
+            break
+        if page == 1:
+            if choice in ("1",):
+                page = 1
+            elif choice in ("", "n", "next", "2", "c", "cmd", "commands"):
+                page = 2
+            else:
+                break
+        else:
+            if choice in ("2",):
+                page = 2
+            elif choice in ("1", "p", "prev", "back", "r", "rules"):
+                page = 1
+            else:
+                break
 
 
 # =============================================================================
 # INTERACTIVE ADVENTURE GAME LOOP
 # =============================================================================
+
+def resolve_option_choice(
+    user_input: str,
+    active_obj: Optional[Objective],
+) -> Tuple[Optional[str], Optional[str]]:
+    """Check if user entered an option letter (A/B/C/D) or number (1/2/3/4).
+
+    Returns:
+        (command_to_execute, feedback_message)
+    """
+    if not active_obj or not getattr(active_obj, "options", None):
+        return None, None
+
+    choice = user_input.strip().upper()
+    letter_map = {"A": 0, "B": 1, "C": 2, "D": 3, "1": 0, "2": 1, "3": 2, "4": 3}
+    if choice not in letter_map:
+        return None, None
+
+    idx = letter_map[choice]
+    options = active_obj.options
+    if idx >= len(options):
+        return None, None
+
+    selected_opt = options[idx]
+    cmd_part = selected_opt.split(" - ")[0].strip()
+    cmd_str = " ".join(cmd_part.split())
+
+    correct_letter = getattr(active_obj, "correct_option", "A").upper()
+    correct_idx = letter_map.get(correct_letter, 0)
+    chosen_letter = ["A", "B", "C", "D"][idx]
+
+    if idx == correct_idx:
+        msg = f"💡 [{chosen_letter}] Correct! Running: {cmd_str}"
+        return cmd_str, msg
+    else:
+        meaning = selected_opt.split(" - ")[1].strip() if " - " in selected_opt else selected_opt
+        msg = f"💡 [{chosen_letter}] '{cmd_str}' is for {meaning}. Try looking for what solves our current task!"
+        return None, msg
+
 
 def interactive_game_loop(
     character_name: str = "Byte",
@@ -971,12 +1090,12 @@ def interactive_game_loop(
     init_w, _ = terminal_size()
     box_w = min(init_w - 4, 68)
 
-    # Initial logs include seamless first task
+    # Initial logs
     if player.current_sector == 0 and not quest.is_completed:
         terminal_logs: List[str] = [
             f"{GREEN}🌱 Welcome to Level 1: Look Around!{RESET}",
-            f"{GREEN}{BOLD}🌱 YOUR FIRST TASK: Type 'pwd' to see where you are!{RESET}",
-            f"{DIM}Tip: You can also type '?' or 'help' at any time.{RESET}",
+            f"{CYAN}Solve the challenge question above by typing the command or option letter!{RESET}",
+            f"{DIM}Tip: Type '?' for a hint, 'map' for level map.{RESET}",
         ]
     else:
         lvl_display = player.current_sector + 1
@@ -987,6 +1106,7 @@ def interactive_game_loop(
 
     hint_tier = 1
     last_objective_id: Optional[str] = None
+    level_start_badges = list(getattr(player, "badges", []))
 
     while True:
         width, height = terminal_size()
@@ -1024,20 +1144,36 @@ def interactive_game_loop(
             total_levels=15,
         )
 
+        # Question card if there is an active objective
+        q_card = ""
+        if active_obj:
+            obj_idx = quest.objectives.index(active_obj) if active_obj in quest.objectives else 0
+            q_card = draw_question_card(
+                question_num=obj_idx + 1,
+                total_questions=len(quest.objectives),
+                question_text=getattr(active_obj, "question", "") or active_obj.description,
+                options=getattr(active_obj, "options", []),
+                scenario=getattr(active_obj, "scenario", ""),
+                width=width,
+                styled=True,
+            )
+
         footer = draw_control_footer(screen_type="terminal", width=width, styled=True)
 
-        # Clear screen and display compact HUD
+        # Clear screen and display compact HUD + Question Card
         sys.stdout.write("\033[H\033[J")
-        sys.stdout.write(hud + "\n\n")
+        sys.stdout.write(hud + "\n")
+        if q_card:
+            sys.stdout.write(q_card + "\n")
 
-        # Display rolling terminal logs
-        overhead = 8
-        available_lines = max(8, height - overhead)
+        # Display rolling terminal logs with space budgeting
+        overhead = 14 if q_card else 6
+        available_lines = max(4, height - overhead)
         display_logs = terminal_logs[-available_lines:] if len(terminal_logs) > available_lines else terminal_logs
         for line in display_logs:
             sys.stdout.write(line + "\n")
 
-        sys.stdout.write("\n" + footer + "\n")
+        sys.stdout.write(footer + "\n")
         sys.stdout.flush()
 
         try:
@@ -1139,19 +1275,53 @@ def interactive_game_loop(
                 hint_tier = min(3, hint_tier + 1)
             continue
 
+        cmd_start_index = len(terminal_logs)
+
+        # Check for option selection [A/B/C/D] or [1/2/3/4]
+        opt_cmd, opt_msg = resolve_option_choice(user_input, active_obj)
+        if opt_cmd is not None:
+            terminal_logs.append(f"{GREEN}{opt_msg}{RESET}")
+            actual_cmd = opt_cmd
+        elif opt_msg is not None:
+            terminal_logs.append(f"{YELLOW}{opt_msg}{RESET}")
+            # Also execute the selected command so the player sees the output!
+            choice = user_input.strip().upper()
+            letter_map = {"A": 0, "B": 1, "C": 2, "D": 3, "1": 0, "2": 1, "3": 2, "4": 3}
+            idx = letter_map.get(choice, 0)
+            if active_obj and getattr(active_obj, "options", None) and idx < len(active_obj.options):
+                opt_str = active_obj.options[idx]
+                cmd_to_show = opt_str.split(" - ")[0].strip()
+                terminal_logs.append(f"{GREEN}byte@adventure:{cwd_short}$ {cmd_to_show}{RESET}")
+                res = interpreter.execute(cmd_to_show)
+                if res.stdout:
+                    first_cmd = cmd_to_show.split()[0] if cmd_to_show.split() else ""
+                    if first_cmd == "ls":
+                        for out_line in colorize_ls_output(res.stdout):
+                            terminal_logs.append(out_line)
+                    else:
+                        for out_line in res.stdout.splitlines():
+                            terminal_logs.append(f"{WHITE}{out_line}{RESET}")
+                if res.stderr:
+                    for err_line in res.stderr.splitlines():
+                        terminal_logs.append(f"{RED}{err_line}{RESET}")
+                terminal_logs.append(f"{DIM}💡 Output shown above. Review the question card to find the command needed for this task!{RESET}")
+            continue
+        else:
+            actual_cmd = user_input
+
         # Check for beginner typo before execution
-        typo = check_typo_or_syntax(user_input)
+        typo = check_typo_or_syntax(actual_cmd)
 
         # Execute command in VFS
-        terminal_logs.append(f"{GREEN}byte@adventure:{cwd_short}$ {user_input}{RESET}")
-        result = interpreter.execute(user_input)
+        terminal_logs.append(f"{GREEN}byte@adventure:{cwd_short}$ {actual_cmd}{RESET}")
+        result = interpreter.execute(actual_cmd)
 
         if typo:
             sugg, expl = typo
-            terminal_logs.append(f"{YELLOW}💡 [TIP] Detected '{user_input}'. Did you mean '{sugg}'? {expl}{RESET}")
+            terminal_logs.append(f"{YELLOW}💡 [TIP] Detected '{actual_cmd}'. Did you mean '{sugg}'? {expl}{RESET}")
 
         if result.stdout:
-            first_cmd = user_input.split()[0] if user_input.split() else ""
+            first_cmd = actual_cmd.split()[0] if actual_cmd.split() else ""
             if first_cmd == "ls":
                 for out_line in colorize_ls_output(result.stdout):
                     terminal_logs.append(out_line)
@@ -1167,44 +1337,27 @@ def interactive_game_loop(
 
         # Objective evaluation
         old_level = player.level
-        old_badges = list(getattr(player, "badges", []))
         is_completed, newly_completed = evaluator.check_quest_progress(
-            quest, vfs, player, last_command=user_input
+            quest, vfs, player, last_command=actual_cmd
         )
 
         if not result.stderr and result.exit_code == 0 and not newly_completed and not result.stdout:
-            first_cmd = user_input.strip().split()[0] if user_input.strip() else ""
+            first_cmd = actual_cmd.strip().split()[0] if actual_cmd.strip() else ""
             if first_cmd in ("touch", "mkdir", "cd", "chmod", "cp", "mv", "rm"):
                 terminal_logs.append(f"{DIM}✓ Done!{RESET}")
 
-        # Check for newly awarded badges
-        new_badges = [b for b in getattr(player, "badges", []) if b not in old_badges]
-        for nb in new_badges:
-            terminal_logs.append(f"{YELLOW}🏆 BADGE UNLOCKED: [{nb}]{RESET}")
-
         if newly_completed:
             hint_tier = 1
-            for item in newly_completed:
-                if isinstance(item, str):
-                    matched_obj = next((o for o in quest.objectives if o.id == item), None)
-                    desc = matched_obj.description if matched_obj else item
-                    reward = matched_obj.xp_reward if matched_obj else 50
-                else:
-                    desc = item.description
-                    reward = item.xp_reward
-
-                banner = get_access_granted_banner(
-                    title=desc[:46].upper(),
-                    xp_awarded=reward,
-                    streak=getattr(player, "streak", 0),
-                    badge=new_badges[0] if new_badges else None,
-                    width=min(width - 4, 60),
-                    styled=True,
-                )
-                for b_line in banner.splitlines():
-                    terminal_logs.append(b_line)
-
+            reward_sum = sum(
+                (next((o.xp_reward for o in quest.objectives if o.id == item), 50) if isinstance(item, str) else item.xp_reward)
+                for item in newly_completed
+            )
             save_game(player, cadet_mode)
+
+            # Preserve current command output, while clearing older clutter from previous attempts
+            recent_logs = list(terminal_logs[cmd_start_index:])
+            terminal_logs.clear()
+            terminal_logs.extend(recent_logs)
 
             if is_completed:
                 if hasattr(player, "mark_sector_completed"):
@@ -1215,6 +1368,16 @@ def interactive_game_loop(
                     player.completed_sectors.append(quest.sector_id)
 
                 terminal_logs.append(f"{MAGENTA}{BOLD}🎉 LEVEL {quest.sector_id + 1} ({quest.sector_name.upper()}) COMPLETED!{RESET}")
+
+                # Show badge status change only after level completion (not in between tasks)
+                curr_badges = list(getattr(player, "badges", []))
+                level_badges = [b for b in curr_badges if b not in level_start_badges]
+                if level_badges:
+                    for nb in level_badges:
+                        terminal_logs.append(f"{YELLOW}🏆 BADGE UNLOCKED: [{nb}]{RESET}")
+                    terminal_logs.append(f"{CYAN}Explorer Badges: {len(curr_badges)}/15 Unlocked ⭐{RESET}")
+                level_start_badges = list(curr_badges)
+
                 if quest.reward_item:
                     terminal_logs.append(f"{YELLOW}🎁 GOODIE ACQUIRED: {quest.reward_item.name} - {quest.reward_item.description}{RESET}")
 
@@ -1238,8 +1401,16 @@ def interactive_game_loop(
                     save_game(player, cadet_mode)
                     for v_line in get_victory_banner(styled=True).splitlines():
                         terminal_logs.append(v_line)
-            elif quest.is_completed and quest.reward_item:
-                terminal_logs.append(f"{YELLOW}🎁 GOODIE ACQUIRED: {quest.reward_item.name} - {quest.reward_item.description}{RESET}")
+            else:
+                # Clean slate for next question in this level! ("one task kazhiyumbo")
+                completed_names = []
+                for item in newly_completed:
+                    matched_obj = next((o for o in quest.objectives if o.id == item), None) if isinstance(item, str) else item
+                    desc = matched_obj.description if matched_obj else str(item)
+                    completed_names.append(desc)
+                summary_text = " & ".join(completed_names)
+                terminal_logs.append(f"{GREEN}✓ Task Cleared: {summary_text} (+{reward_sum} XP ⭐){RESET}")
+                terminal_logs.append(f"{CYAN}Here is your next challenge question! Check the card above. 🌱{RESET}")
 
         if player.level > old_level:
             terminal_logs.append(f"{MAGENTA}{BOLD}🌟 LEVEL UP! You reached Level {player.level}! Title: {player.rank}{RESET}")
