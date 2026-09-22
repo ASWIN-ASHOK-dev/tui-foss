@@ -1,12 +1,7 @@
-"""CyberShell RPG application UI.
+"""Byte's Linux Adventure - Interactive TUI Application & Screens.
 
 Handles screen routing, fixed-frame layout, terminal input buffer,
-combat log ticker, and boss HUD elements.
-
-Authors:
-- Poornendhu: Cyber-TUI Lead & Frame Renderer (layout core, screen transitions)
-- Gautham: Visual FX, ASCII Art & Terminal Box Specialist (terminal buffer, combat ticker, boss HUD)
-- Akash: Hacker Codex & Security Minigame Specialist (screen views)
+friendly activity ticker, and interactive screens.
 """
 
 from __future__ import annotations
@@ -21,12 +16,15 @@ if hasattr(sys.stdout, "reconfigure"):
     except Exception:
         pass
 
+from cybershell.contracts import UIProtocol
 from cybershell.tools.chmod_minigame import ChmodMinigame
 from cybershell.tools.codex import Codex
 from cybershell.tools.map import MainframeMap, default_mainframe_map
 
 from .ascii_art import (
+    ADVENTURE_LOGO,
     CYBER_LOGO,
+    FIELD_MANUAL_HEADER,
     format_boss_hp_bar,
     get_defeat_banner,
     get_portrait,
@@ -43,7 +41,7 @@ from .renderer import (
 
 
 # =============================================================================
-# Terminal Input Buffer Widget (Gautham - Day 3)
+# Terminal Input Buffer Widget
 # =============================================================================
 
 class TerminalBuffer:
@@ -51,14 +49,14 @@ class TerminalBuffer:
 
     def __init__(
         self,
-        prompt: str = "operative@cybershell:~$ ",
+        prompt: str = "byte@adventure:~$ ",
         max_lines: int = 100,
     ) -> None:
         self.prompt = prompt
         self.max_lines = max_lines
         self.logs: List[str] = [
-            "operative@cybershell:~$ System initialized.",
-            "operative@cybershell:~$ Type 'help' for available commands.",
+            f"{self.prompt}Welcome to Byte's Linux Adventure! 🌱",
+            f"{self.prompt}Type 'help' or '?' for tips, or type 'pwd' to begin.",
         ]
         self.history: List[str] = []
         self.history_index: int = -1
@@ -114,30 +112,34 @@ class TerminalBuffer:
 
 
 # =============================================================================
-# Combat Log Ticker (Gautham - Day 4)
+# Activity Ticker
 # =============================================================================
 
 class CombatTicker:
-    """Real-time bottom broadcast strip for combat feedback and loot drops."""
+    """Friendly bottom activity banner for updates, hints, and badges."""
 
     def __init__(self) -> None:
-        self.active_message: str = "SYSTEM ONLINE. Welcome to CyberShell v2.0."
+        self.active_message: str = "🌱 Welcome to Byte's Linux Adventure!"
         self.history: List[str] = [self.active_message]
 
     def log(self, message: str, category: str = "info") -> None:
-        """Push an alert message to the broadcast ticker."""
+        """Push an alert or friendly message to the activity ticker."""
         prefix = ""
         cat = category.lower()
-        if cat == "backlash":
-            prefix = "⚡ "
-        elif cat == "crit":
-            prefix = "💥 "
+        if cat in ("badge", "star", "reward"):
+            prefix = "⭐ "
         elif cat == "loot":
             prefix = "🎁 "
-        elif cat in ("xp", "level"):
+        elif cat in ("xp", "level", "levelup"):
             prefix = "🌟 "
         elif cat == "objective":
             prefix = "🎯 "
+        elif cat == "hint":
+            prefix = "💡 "
+        elif cat == "backlash":
+            prefix = "⚡ "
+        elif cat == "crit":
+            prefix = "💥 "
         elif cat == "siren":
             prefix = "🚨 "
 
@@ -155,15 +157,19 @@ class CombatTicker:
         return f"[ {msg} ]".center(width)
 
 
+# Backward-compatible alias
+ActivityTicker = CombatTicker
+
+
 # =============================================================================
-# RPGApp Screen Controller (Poornendhu, Gautham & Akash)
+# RPGApp Screen Controller
 # =============================================================================
 
 class RPGApp:
-    """Main UI controller for CyberShell.
+    """Main UI controller for Byte's Linux Adventure.
 
-    Implements UIProtocol (Amy) with double-pane layout (Poornendhu),
-    terminal widgets, combat ticker, boss HUD (Gautham), and tactical tools (Akash).
+    Implements UIProtocol with dual-pane layout, terminal buffer,
+    friendly activity ticker, and learning tools.
     """
 
     SCREEN_TITLE = 0
@@ -172,14 +178,16 @@ class RPGApp:
     SCREEN_INVENTORY = 3
     SCREEN_MAP = 4
     SCREEN_MINIGAME = 5
+    SCREEN_MANUAL = 6
 
     SCREEN_NAMES = {
         SCREEN_TITLE: "TITLE",
-        SCREEN_LAB: "MISSION LAB",
-        SCREEN_CODEX: "CODEX",
-        SCREEN_INVENTORY: "INVENTORY",
-        SCREEN_MAP: "MAP",
-        SCREEN_MINIGAME: "MINIGAME",
+        SCREEN_LAB: "ADVENTURE PLAYGROUND",
+        SCREEN_CODEX: "COMMAND GUIDE",
+        SCREEN_INVENTORY: "BACKPACK",
+        SCREEN_MAP: "ADVENTURE MAP",
+        SCREEN_MINIGAME: "PERMISSIONS PUZZLE",
+        SCREEN_MANUAL: "FIELD MANUAL & RULES",
     }
 
     def __init__(
@@ -193,20 +201,20 @@ class RPGApp:
         self.hp = hp
         self.max_hp = max_hp
         self.xp = xp
-        self.inventory = []
+        self.inventory: List[Any] = []
         self.current_screen = self.SCREEN_TITLE
 
-        # Gautham's visual components
+        # Visual components
         self.terminal_buffer = TerminalBuffer()
         self.ticker = CombatTicker()
 
-        # Boss encounter state (Day 5)
+        # Backward compatibility for boss/encounter state
         self.boss_name: str = "SENTINEL OVERLORD"
         self.boss_hp: int = 100
         self.boss_max_hp: int = 100
         self.is_boss_active: bool = False
 
-        # Integrated tactical tools (Akash: Codex / Map / Chmod Minigame)
+        # Tools
         self.codex = Codex()
         self.mainframe: MainframeMap = default_mainframe_map()
         self.minigame = ChmodMinigame(difficulty="easy")
@@ -222,13 +230,13 @@ class RPGApp:
         return self.SCREEN_NAMES[self.current_screen]
 
     def update_stats(self, hp: int, max_hp: int, xp: int) -> None:
-        """Update operative health and progression stats (UIProtocol)."""
+        """Update player health and progression stats (UIProtocol)."""
         self.hp = hp
         self.max_hp = max_hp
         self.xp = xp
 
     def log_ticker(self, message: str, category: str = "info") -> None:
-        """Push an alert message to the combat ticker (UIProtocol)."""
+        """Push a message to the activity ticker (UIProtocol)."""
         self.ticker.log(message, category=category)
 
     def set_boss_encounter(
@@ -238,20 +246,21 @@ class RPGApp:
         hp: int = 100,
         max_hp: int = 100,
     ) -> None:
-        """Toggle Sector 5 Boss battle encounter HUD."""
+        """Toggle boss encounter state (kept for backward compatibility)."""
         self.is_boss_active = active
         self.boss_name = name
         self.boss_hp = hp
         self.boss_max_hp = max_hp
 
     def update_boss_hp(self, hp: int) -> None:
-        """Update current Boss HP."""
+        """Update boss HP (kept for backward compatibility)."""
         self.boss_hp = max(0, hp)
 
     def render_boss_hud(self, width: int = 80, styled: bool = False) -> str:
-        """Render Sector 5 Boss siren warning and dynamic HP bar."""
+        """Render challenge reminder banner without clipping."""
+        width = max(20, width)
         siren = get_siren_banner(
-            f"WARNING: {self.boss_name} DETECTED - SECTOR 5 LOCKDOWN",
+            f"CHALLENGE: {self.boss_name}",
             width=width,
             styled=styled,
         )
@@ -260,63 +269,64 @@ class RPGApp:
         )
         return f"{siren}\n{bar.center(width)}"
 
-    def render_title(self, width: int) -> str:
-        """Render the title screen with cyberpunk logo and menu options."""
-        logo_lines = [line.center(width) for line in CYBER_LOGO.strip("\n").splitlines()]
+    def render_title(self, width: int = 80) -> str:
+        """Render the title screen with friendly logo and menu options."""
+        width = max(40, width)
+        logo_lines = [line.center(width) for line in ADVENTURE_LOGO.strip("\n").splitlines()]
         menu_lines = [
             "",
-            "CYBERSHELL RPG".center(width),
-            "A TERMINAL-BASED CYBER ADVENTURE".center(width),
+            "🌱 BYTE'S LINUX ADVENTURE 🌱".center(width),
+            "A friendly, playful terminal journey through Linux".center(width),
             "",
-            "[1] ENTER MISSION LAB".center(width),
-            "[2] CODEX".center(width),
-            "[3] INVENTORY".center(width),
-            "[4] MAP".center(width),
-            "[5] MINIGAME".center(width),
+            "[1] START ADVENTURE".center(width),
+            "[2] COMMAND GUIDE".center(width),
+            "[3] BACKPACK & ITEMS".center(width),
+            "[4] ADVENTURE MAP (15 LEVELS)".center(width),
+            "[5] PERMISSIONS PUZZLE".center(width),
+            "[6] FIELD MANUAL & RULES".center(width),
+            "[0] EXIT".center(width),
             "",
-            "Press a number to navigate.".center(width),
+            "Press a number to explore. [Esc] Return to menu".center(width),
         ]
         return "\n".join(logo_lines + menu_lines)
 
     def render_lab(
         self,
-        width: int,
+        width: int = 80,
         npc_name: Optional[str] = None,
         intel_lines: Optional[List[str]] = None,
         terminal_lines: Optional[List[str]] = None,
     ) -> str:
-        """Render the Mission Lab screen with split panels and combat ticker."""
+        """Render the Adventure Playground screen with split panels and activity ticker."""
         header = draw_double_header(
             self.character_name,
             self.hp,
             self.max_hp,
             self.xp,
-            "MISSION LAB",
+            "ADVENTURE PLAYGROUND",
             width,
         )
 
-        # Build Mission Intel panel lines
         if intel_lines is not None:
             left_content = list(intel_lines)
         else:
             npc = npc_name or self.character_name
             portrait = get_portrait(npc, styled=False)
             left_content = [
-                f"NPC: [{npc.upper()}]",
-                "Status: ACTIVE",
+                f"GUIDE: [{npc.upper()}]",
+                "Status: EXPLORING 🌱",
             ] + portrait + [
-                "Objective: Find the encrypted file",
-                "Progress: 0/3",
+                "Objective: Type 'pwd' to look around",
+                "Progress: 0/15 Levels",
             ]
 
-        # Build Terminal panel lines
         if terminal_lines is not None:
             right_content = list(terminal_lines)
         else:
             right_content = self.terminal_buffer.get_visible_logs(max(6, len(left_content)))
 
         panels = draw_split_panels(
-            "MISSION INTEL",
+            "GUIDE & OBJECTIVE",
             left_content,
             "TERMINAL",
             right_content,
@@ -333,8 +343,8 @@ class RPGApp:
 
         return "\n".join(components)
 
-    def render_simple_screen(self, title: str, width: int) -> str:
-        """Render a temporary placeholder screen."""
+    def render_simple_screen(self, title: str, width: int = 80) -> str:
+        """Render a placeholder screen."""
         header = draw_double_header(
             self.character_name,
             self.hp,
@@ -348,59 +358,59 @@ class RPGApp:
             "",
             title.center(width),
             "",
-            "This screen is ready for module integration.".center(width),
+            "This screen is ready for exploration.".center(width),
         ]
 
         return header + "\n" + "\n".join(body)
 
     def render_victory(self, width: int = 80) -> str:
-        """Render victory celebration screen."""
+        """Render adventure complete celebration screen."""
         return get_victory_banner(styled=False).center(width)
 
     def render_defeat(self, width: int = 80) -> str:
-        """Render defeat/game over screen."""
+        """Render encouragement / retry screen."""
         return get_defeat_banner(styled=False).center(width)
 
-    def render_codex(self, width: int) -> str:
-        """Render the Hacker Codex screen listing all known commands."""
+    def render_codex(self, width: int = 80) -> str:
+        """Render the Command Guide screen listing all known commands."""
         header = draw_double_header(
             self.character_name,
             self.hp,
             self.max_hp,
             self.xp,
-            "HACKER CODEX",
+            "COMMAND GUIDE // CODEX",
             width,
         )
 
-        content = ["[ SPELLBOOK // TACTICAL COMMAND ARCHIVE ]", ""]
+        content = ["[ 🌱 LINUX COMMAND DIRECTORY // CODEX ]", ""]
         for entry in self.codex.list_commands():
             content.append(f"  {entry['name']:<9} {entry['description']}")
         content.append("")
-        content.append("Type a command name such as 'chmod' to decrypt its entry.")
+        content.append("Type 'man <command>' or 'lookup <command>' in the terminal for details!")
 
-        panel_lines = draw_panel("HACKER CODEX", content, width - 4)
+        panel_lines = draw_panel("COMMAND GUIDE", content, width - 4)
         return header + "\n" + "\n".join(panel_lines)
 
-    def render_map(self, width: int) -> str:
-        """Render the Tactical Mainframe Map screen."""
+    def render_map(self, width: int = 80) -> str:
+        """Render the Adventure Map screen."""
         header = draw_double_header(
             self.character_name,
             self.hp,
             self.max_hp,
             self.xp,
-            "TACTICAL MAINFRAME MAP",
+            "ADVENTURE MAP (15 LEVELS)",
             width,
         )
         return header + "\n" + self.mainframe.render()
 
-    def render_minigame(self, width: int) -> str:
-        """Render the Chmod Security Minigame door."""
+    def render_minigame(self, width: int = 80) -> str:
+        """Render the Permissions Minigame screen."""
         header = draw_double_header(
             self.character_name,
             self.hp,
             self.max_hp,
             self.xp,
-            "CHMOD SECURITY MINIGAME",
+            "PERMISSIONS PUZZLE // MINIGAME",
             width,
         )
         if self.minigame.active_puzzle is None:
@@ -408,21 +418,21 @@ class RPGApp:
         door = self.minigame.render_door()
         return header + "\n" + door
 
-    def render_inventory(self, width: int) -> str:
-        """Render the Operative's Inventory screen."""
+    def render_inventory(self, width: int = 80) -> str:
+        """Render the Backpack and collected goodies screen."""
         header = draw_double_header(
             self.character_name,
             self.hp,
             self.max_hp,
             self.xp,
-            "OPERATIVE INVENTORY",
+            "BACKPACK & ITEMS",
             width,
         )
 
-        content = ["[ EQUIPMENT & LOOT ]", ""]
+        content = ["[ 🎒 COLLECTED GOODIES & BADGES ]", ""]
         if not self.inventory:
-            content.append("  Inventory is empty.")
-            content.append("  Complete objectives and missions to earn loot.")
+            content.append("  Your backpack is currently empty.")
+            content.append("  Complete levels and discover secrets to collect goodies! 🌱")
         else:
             for item in self.inventory:
                 name = item.name if hasattr(item, 'name') else str(item)
@@ -433,10 +443,28 @@ class RPGApp:
                     content.append(f"      - {desc}")
                 content.append("")
         content.append("")
-        content.append("Press Enter to return.")
+        content.append("Press Enter or Esc to return.")
 
-        panel_lines = draw_panel("INVENTORY", content, width - 4)
+        panel_lines = draw_panel("BACKPACK", content, width - 4)
         return header + "\n" + "\n".join(panel_lines)
+
+    def render_manual(self, width: int = 80) -> str:
+        """Render the Field Manual & Rules screen."""
+        lines = [
+            FIELD_MANUAL_HEADER,
+            "Welcome to Byte's Linux Adventure! 🌱",
+            "",
+            "• Exactly 15 bite-sized levels teaching real Linux skills.",
+            "• Each level has 1-2 friendly goals.",
+            "• Type Linux commands at the prompt (e.g. 'pwd', 'ls', 'cat').",
+            "• Mistakes deal ZERO damage! Explore freely and learn.",
+            "• Need a hint? Type '?' or 'hint' anytime.",
+            "• Want to see all levels? Type 'map'.",
+            "",
+            "Press Enter to return to the adventure!",
+        ]
+        panel = draw_panel("FIELD MANUAL & RULES", lines, width - 4)
+        return "\n".join(panel)
 
     def render(self) -> str:
         """Render the currently active screen."""
@@ -460,11 +488,14 @@ class RPGApp:
         if self.current_screen == self.SCREEN_MINIGAME:
             return self.render_minigame(width)
 
+        if self.current_screen == self.SCREEN_MANUAL:
+            return self.render_manual(width)
+
         return ""
 
 
 def create_app() -> RPGApp:
-    """Create a default CyberShell application."""
+    """Create a default Linux Adventure application instance."""
     return RPGApp()
 
 

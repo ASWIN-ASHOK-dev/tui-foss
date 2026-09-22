@@ -65,7 +65,7 @@ from cybershell.tools.map import (  # noqa: E402
 REQUIRED_COMMAND_NAMES = (
     "ls", "cd", "cat", "grep", "chmod", "rm", "touch", "mkdir",
     "pwd", "find", "cp", "mv", "head", "tail", "wc", "echo",
-    "man", "lookup", "help", "hint",
+    "man", "lookup", "help", "hint", "sort", "less",
 )
 
 

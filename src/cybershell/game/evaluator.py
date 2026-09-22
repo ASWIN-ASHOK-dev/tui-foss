@@ -1,6 +1,6 @@
-"""Quest Evaluator Logic for CyberShell RPG v2.0.
+"""Quest Evaluator Logic for Byte's Linux Adventure.
 
-Author: Aswin (Game State, Progression & Evaluator)
+Evaluates friendly quest objectives against VFS and player state.
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ from cybershell.contracts import Objective, PlayerStats, Quest
 
 
 class QuestEvaluator:
-    """Evaluates quest objectives against VFS and player state."""
+    """Evaluates adventure objectives against VFS and player state."""
 
     def evaluate_objective(
         self,
@@ -31,7 +31,6 @@ class QuestEvaluator:
         Returns:
             True if the objective is met, False otherwise.
         """
-        # If command tracking is active, ensure the executed command matches required command
         if last_command is None and hasattr(vfs, "last_command"):
             last_command = getattr(vfs, "last_command", None)
 
@@ -41,8 +40,8 @@ class QuestEvaluator:
                 return False
             tokens = cmd_stripped.split()
             first_token = tokens[0] if tokens else ""
-            # Must match the objective's required command or be part of the command pipeline
-            if first_token != objective.command and objective.command not in tokens:
+            allowed = [c.strip() for c in objective.command.replace("|", ",").split(",") if c.strip()]
+            if not any(a == first_token or a in tokens for a in allowed):
                 return False
 
         ptype = objective.predicate_type
@@ -50,11 +49,13 @@ class QuestEvaluator:
         expected = objective.predicate_expected
 
         try:
+            home_dir = getattr(vfs, "home_dir", "/home/operative")
+
             if ptype == "file_exists":
                 exists = vfs.exists(target)
                 if not exists and not target.startswith("/"):
                     try:
-                        exists = vfs.exists(f"/home/operative/{target}")
+                        exists = vfs.exists(f"{home_dir}/{target}")
                     except Exception:
                         pass
                 return exists == bool(expected)
@@ -63,7 +64,7 @@ class QuestEvaluator:
                 exists = vfs.exists(target)
                 if not exists and not target.startswith("/"):
                     try:
-                        exists = vfs.exists(f"/home/operative/{target}")
+                        exists = vfs.exists(f"{home_dir}/{target}")
                     except Exception:
                         pass
                 return (not exists) == bool(expected)
@@ -72,7 +73,7 @@ class QuestEvaluator:
                 read_target = target
                 if not vfs.exists(read_target):
                     if not target.startswith("/"):
-                        read_target = f"/home/operative/{target}"
+                        read_target = f"{home_dir}/{target}"
                     if not vfs.exists(read_target):
                         return False
                 content = vfs.read_file(read_target)
@@ -81,20 +82,33 @@ class QuestEvaluator:
             elif ptype == "permission_equals":
                 node = vfs.get_node(target)
                 if node is None and not target.startswith("/"):
-                    node = vfs.get_node(f"/home/operative/{target}")
+                    node = vfs.get_node(f"{home_dir}/{target}")
                 if node is None:
                     return False
-                # Assuming node has a 'permissions' attribute as per VFS design
-                return str(getattr(node, "mode_octal", "")) == str(expected)
+                mode = str(getattr(node, "mode_octal", ""))
+                if str(expected) in ("755", "+x"):
+                    return mode == "755" or bool(node.permissions & 0o111)
+                return mode == str(expected)
 
             elif ptype == "cwd_equals":
-                return vfs.get_cwd_path() == str(target)
+                cwd = vfs.get_cwd_path()
+                target_str = str(target)
+                if cwd == target_str:
+                    return True
+                if target_str.startswith("/home/"):
+                    sub_parts = target_str.split("/")
+                    if len(sub_parts) > 3:
+                        sub = "/".join(sub_parts[3:])
+                        if cwd.endswith(sub):
+                            return True
+                    elif cwd.startswith("/home/"):
+                        return True
+                return False
 
             elif ptype == "file_read":
-                # Verifies that target file exists and was inspected using cat, head, tail, or grep
                 exists = vfs.exists(target)
                 if not exists and not target.startswith("/"):
-                    exists = vfs.exists(f"/home/operative/{target}")
+                    exists = vfs.exists(f"{home_dir}/{target}")
                 if not exists:
                     return False
                 if last_command:
@@ -106,22 +120,22 @@ class QuestEvaluator:
                 return False
 
             elif ptype == "pipeline_used":
-                # Verifies that a pipeline '|' was executed with target and/or expected pattern
                 if last_command and "|" in last_command:
+                    low_cmd = last_command.lower()
                     target_name = target.split("/")[-1] if target else ""
-                    if target and target not in last_command and target_name not in last_command:
+                    if target and (target.lower() not in low_cmd and target_name.lower() not in low_cmd):
                         return False
-                    if expected is not True and str(expected) not in last_command:
+                    if expected is not True and str(expected).lower() not in low_cmd:
                         return False
                     return True
                 return False
 
             elif ptype == "pattern_matched":
-                # Verifies pattern search was run with grep or expected string matched
-                if last_command and "grep" in last_command:
+                if last_command:
+                    low_cmd = last_command.lower()
+                    low_exp = str(expected).lower()
                     target_name = target.split("/")[-1] if target else ""
-                    if (str(expected).lower() in last_command.lower() or 
-                        (target and (target in last_command or target_name in last_command))):
+                    if (low_exp in low_cmd) or (target_name and target_name.lower() in low_cmd):
                         return True
                 if vfs.exists(target):
                     try:
@@ -131,11 +145,9 @@ class QuestEvaluator:
                 return False
 
             else:
-                # Unknown predicate type
                 return False
 
         except Exception:
-            # Catch any unexpected VFS errors (e.g. read_file on directory)
             return False
 
     def check_quest_progress(
@@ -145,10 +157,10 @@ class QuestEvaluator:
         state: PlayerStats,
         last_command: Optional[str] = None,
     ) -> Tuple[bool, List[str]]:
-        """Evaluate quest objectives sequentially and grant rewards for newly completed ones.
+        """Evaluate adventure objectives sequentially and grant friendly rewards.
         
         Args:
-            quest: The active quest.
+            quest: The active level quest.
             vfs: The virtual file system instance.
             state: The player's stats to update.
             last_command: Optional last command executed by player.
@@ -159,12 +171,13 @@ class QuestEvaluator:
         if last_command is None and hasattr(vfs, "last_command"):
             last_command = getattr(vfs, "last_command", None)
 
-        # Check for exploration easter eggs
+        # Exploration secrets
         if last_command:
             secrets = {
-                ".easter_egg": "Quarantine Mystery Discovered (+50 XP)",
-                ".vault_backup.key": "Hidden Vault Pass Discovered (+50 XP)",
-                "secret_stash": "Undocumented File Recovered (+50 XP)",
+                ".easter_egg": "Easter Egg Discovered (+50 XP)",
+                ".secret_recipe": "Secret Recipe Discovered (+50 XP)",
+                ".hidden_clue": "Hidden Attic Clue Discovered (+50 XP)",
+                "star.txt": "Golden Star Spotted (+50 XP)",
             }
             for sec_key, sec_title in secrets.items():
                 if sec_key in last_command and hasattr(state, "add_secret"):
@@ -175,7 +188,7 @@ class QuestEvaluator:
 
         newly_completed_ids = []
 
-        # Sequential evaluation: only evaluate the currently active (first uncompleted) objective
+        # Evaluate the active objective
         current = quest.current_objective
         if current is not None:
             if self.evaluate_objective(current, vfs, state, last_command=last_command):
@@ -185,27 +198,34 @@ class QuestEvaluator:
                     state.increase_streak()
                 newly_completed_ids.append(current.id)
 
-        # Check if the overall quest has just been completed
+        # Check if entire level is completed
         if quest.is_completed and not quest.completed:
             quest.completed = True
             state.gain_xp(quest.reward_xp)
             if quest.reward_item:
                 state.add_item(quest.reward_item)
             
-            # Award sector mastery badge
-            sector_badges = {
-                0: "Recon Specialist 🧭",
-                1: "Dotfile Detective 🕵️",
-                2: "Log Diver 🔍",
-                3: "Permission Architect 🛡️",
-                4: "Pipeline Master ⚡",
-                5: "Mainframe Liberator 👑",
+            level_badges = {
+                0: "First Steps 🌱",
+                1: "Pathfinder 🧭",
+                2: "Curious Reader 📖",
+                3: "Dotfile Detective 🔍",
+                4: "Treasure Hunter 💎",
+                5: "Pattern Spotter 🔎",
+                6: "Organizer 🧰",
+                7: "Clean & Tidy 🧹",
+                8: "Permission Pal 🛡️",
+                9: "Counter & Sorter 🧮",
+                10: "Pipeline Connecter ⚡",
+                11: "Stream Director 🖋️",
+                12: "Master Searcher 🔭",
+                13: "Attic Conqueror 🏆",
+                14: "Master Explorer 👑",
             }
             if hasattr(state, "add_badge"):
-                badge = sector_badges.get(quest.sector_id, "Sector Master")
+                badge = level_badges.get(quest.sector_id, f"Level {quest.sector_id + 1} Star ⭐")
                 state.add_badge(badge)
 
-            # Ensure the sector is marked as completed
             if hasattr(state, "mark_sector_completed"):
                 state.mark_sector_completed(quest.sector_id)
             elif quest.sector_id not in state.completed_sectors:

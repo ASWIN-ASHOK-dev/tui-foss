@@ -1,6 +1,6 @@
-"""Story and Quest Definitions for CyberShell RPG.
+"""Byte's Linux Adventure - 15 Adventure Levels & Quests.
 
-Author: Neha (Narrative & Quests)
+Friendly, playful exploration scenarios teaching Linux fundamentals step by step.
 """
 
 from __future__ import annotations
@@ -9,557 +9,942 @@ from typing import Dict
 
 from cybershell.contracts import Item, Objective, Quest
 
+
 def get_sector_quests() -> Dict[int, Quest]:
-    """Returns a dictionary mapping sector IDs to their Quests."""
-    quests = {}
+    """Returns a dictionary mapping level IDs (0-14 for Levels 1-15) to their Quests."""
+    quests: Dict[int, Quest] = {}
 
-    # Sector 0: Quarantine Zone
+    # -------------------------------------------------------------------------
+    # LEVEL 1: LOOK AROUND (pwd, ls)
+    # -------------------------------------------------------------------------
     quests[0] = Quest(
-        id="quest_sector_0",
+        id="level_01",
         sector_id=0,
-        sector_name="Quarantine Zone",
+        sector_name="Look Around",
         npc_name="Byte",
-        lore=(
-            "You awaken inside an isolated quarantine memory sandbox after an unexpected memory wipe. "
-            "A corporate security lockdown has sealed off all engineers from the central network."
-        ),
+        lore="You just arrived in your new Linux world! Let's get our bearings and see what is nearby.",
         dialogue=[
-            "Operative! Welcome back to the grid. Your memory registers appear scrambled.",
-            "Verify your mainframe location coordinates before venturing forward.",
-            "Survey the sandbox environment to discover breadcrumbs and directories.",
-            "Deploy the operative beacon file 'beacon.log' to unlock the perimeter gate.",
-        ],
-        objectives=[
-            Objective(
-                id="obj_0_1",
-                description="Verify your current location coordinates inside the quarantine sandbox.",
-                hint="Type 'pwd' at the prompt and press Enter to verify your location.",
-                command="pwd",
-                syntax="pwd",
-                explanation="Prints the absolute pathname of your current working directory.",
-                predicate_type="cwd_equals",
-                predicate_target="/home/operative",
-                xp_reward=50,
-                hints=[
-                    "Check where you are currently located in the mainframe filesystem.",
-                    "Look up the standard command that prints your working directory coordinates.",
-                    "Execute 'pwd' to confirm your coordinates.",
-                ],
-                scenario="System memory registers are scrambled. Confirm your terminal coordinates.",
-            ),
-            Objective(
-                id="obj_0_2",
-                description="Survey the quarantine environment for directory assets, hidden files, and permissions.",
-                hint="Type 'ls -la' at the prompt and press Enter to inspect all files and permissions.",
-                command="ls",
-                syntax="ls [-la]",
-                explanation="Lists directory contents with detailed file permissions (-l) and hidden dotfiles (-a).",
-                predicate_type="file_exists",
-                predicate_target="/home/operative",
-                xp_reward=50,
-                hints=[
-                    "Inspect the contents of the current directory to see what files were left behind.",
-                    "Check 'man ls' to see how to list all directory contents including details.",
-                    "Run 'ls' or 'ls -la' to survey all files, directories, and hidden assets.",
-                ],
-                scenario="The incident left multiple status logs and system files. Inspect your surroundings.",
-            ),
-            Objective(
-                id="obj_0_3",
-                description="Deploy an operative status beacon named 'beacon.log' to synchronize clearance.",
-                hint="Type 'touch beacon.log' at the prompt and press Enter to deploy the beacon.",
-                command="touch",
-                syntax="touch <filename>",
-                explanation="Creates a new empty file or updates the timestamp of an existing file.",
-                predicate_type="file_exists",
-                predicate_target="beacon.log",
-                xp_reward=50,
-                hints=[
-                    "Place a new status file named 'beacon.log' in your active directory.",
-                    "The standard tool to create empty files without opening an editor is 'touch'.",
-                    "Execute 'touch beacon.log' to deploy your signal.",
-                ],
-                scenario="With reconnaissance complete, drop the recovery beacon to link with external grid.",
-            ),
-        ],
-        reward_item=Item(
-            id="item_quarantine_chip",
-            name="Quarantine Keychip",
-            description="An encrypted hardware token that grants clearance to Sector 1 File Vault.",
-            category="hardware",
-            rarity="rare",
-        ),
-        reward_xp=100,
-        environment_tree={
-            "README.txt": (
-                "[QUARANTINE SECTOR NOTICE]\n"
-                "Emergency reboot occurred at 03:41 UTC.\n"
-                "System logs and breadcrumbs are preserved under logs/ and system/.\n"
-            ),
-            "logs": {
-                "incident.log": (
-                    "[SECTOR 0 INCIDENT REPORT]\n"
-                    "Alert: Unauthorized memory probe detected.\n"
-                    "Status: Sandbox locked down pending operative verification.\n"
-                ),
-                "boot.log": "System registers loaded successfully.\n",
-            },
-            "system": {
-                "telemetry.conf": "PORT=443\nNODE=SEC_0\nSTATUS=ONLINE\n",
-            },
-            ".easter_egg": "OPERATIVE SECRET: You explored the hidden dotfiles of Sector 0! (+50 XP)\n",
-        },
-    )
-
-    # Sector 1: The File Vault
-    quests[1] = Quest(
-        id="quest_sector_1",
-        sector_id=1,
-        sector_name="The File Vault",
-        npc_name="Cipher",
-        lore=(
-            "You have breached the quarantine perimeter and reached the corporate File Vault, "
-            "an encrypted data archive containing classified corporate secrets and security logs."
-        ),
-        dialogue=[
-            "Operative, we have successfully infiltrated the corporate File Vault.",
-            "Record our reconnaissance telemetry by creating 'intel.txt'.",
-            "Make a backup copy named 'intel.bak' before modifying critical data.",
-            "Store the vault decryption passphrase 'OMNICORP' into 'intel.txt' using redirection.",
+            "Hello! I'm Byte, your friendly guide.",
+            "Whenever you arrive in a new folder, two commands are super handy: 'pwd' and 'ls'.",
+            "Let's find where you are first!",
         ],
         objectives=[
             Objective(
                 id="obj_1_1",
-                description="Create an operative reconnaissance telemetry file named 'intel.txt'.",
-                hint="Type 'touch intel.txt' at the prompt and press Enter to create the file.",
-                command="touch",
-                syntax="touch <filename>",
-                explanation="Creates a new, empty file in the current working directory.",
-                predicate_type="file_exists",
-                predicate_target="intel.txt",
-                xp_reward=75,
+                description="Find where you are in the computer using pwd.",
+                hint="Type 'pwd' and press Enter to see your current directory path.",
+                command="pwd",
+                syntax="pwd",
+                explanation="Prints your current working directory path.",
+                predicate_type="cwd_equals",
+                predicate_target="/home/operative",
+                xp_reward=50,
                 hints=[
-                    "Create an intel file named intel.txt to store reconnaissance findings.",
-                    "Use 'touch' with the desired file name.",
-                    "Execute 'touch intel.txt' at the prompt.",
+                    "Which command prints your current folder location?",
+                    "It stands for 'Print Working Directory'.",
+                    "Type: pwd",
                 ],
-                scenario="Create an active reconnaissance log before inspecting the vault archives.",
+                scenario="You just arrived. Where are you in the filesystem?",
             ),
             Objective(
                 id="obj_1_2",
-                description="Duplicate your telemetry file to create a backup copy named 'intel.bak'.",
-                hint="Type 'cp intel.txt intel.bak' at the prompt and press Enter to copy the file.",
-                command="cp",
-                syntax="cp <source_file> <dest_file>",
-                explanation="Copies files or directories from a source location to a destination path.",
-                predicate_type="file_exists",
-                predicate_target="intel.bak",
-                xp_reward=75,
+                description="Look around to see what files are nearby using ls.",
+                hint="Type 'ls' and press Enter to list the files in this folder.",
+                command="ls",
+                syntax="ls",
+                explanation="Lists the files and folders in your current location.",
+                predicate_type="cwd_equals",
+                predicate_target="/home/operative",
+                xp_reward=50,
                 hints=[
-                    "Duplicate your telemetry record so modifying it won't lose original state.",
-                    "Check 'man cp' to review file copy syntax.",
-                    "Run 'cp intel.txt intel.bak' to clone the file.",
+                    "Use the list command to see nearby files and folders.",
+                    "The command is just two letters: l and s.",
+                    "Type: ls",
                 ],
-                scenario="In corporate mainframe espionage, always duplicate critical intel files.",
-            ),
-            Objective(
-                id="obj_1_3",
-                description="Store the vault decryption code 'OMNICORP' into 'intel.txt' using redirection.",
-                hint="Type 'echo \"OMNICORP\" > intel.txt' at the prompt and press Enter to store the key.",
-                command="echo",
-                syntax="echo <text> > <filename>",
-                explanation="Outputs text; the redirect operator (>) writes the output into the target file.",
-                predicate_type="file_contains",
-                predicate_target="intel.txt",
-                predicate_expected="OMNICORP",
-                xp_reward=100,
-                hints=[
-                    "Write the authorization phrase OMNICORP into intel.txt.",
-                    "Use 'echo' combined with the output redirection operator '>'.",
-                    "Execute 'echo \"OMNICORP\" > intel.txt'.",
-                ],
-                scenario="Write the discovered clearance code into your intel log to authorize transmission.",
+                scenario="Now look around. Something useful is nearby.",
             ),
         ],
         reward_item=Item(
-            id="item_vault_pass",
-            name="Vault Pass",
-            description="A cryptographic clearance pass required to route through the Sector 2 Datastream.",
-            category="key",
+            id="item_compass",
+            name="Wooden Compass 🧭",
+            description="Helps you always find your bearings in any folder.",
+            category="tool",
             rarity="common",
         ),
-        reward_xp=150,
+        reward_xp=100,
         environment_tree={
-            "vault_notes.txt": (
-                "[VAULT ARCHIVE DIRECTORY]\n"
-                "Security clearance required for datastream transit.\n"
-                "Create an intel log and store the passkey OMNICORP.\n"
-            ),
-            ".vault_token": "VAULT_TOKEN=CIPHER_882_AUTH\n",
-            ".secret": {
-                ".vault_backup.key": "SECRET BONUS: Hidden vault passkey retrieved! (+50 XP)\n",
-            },
+            "welcome.txt": "Welcome to your Linux Adventure! There is so much to explore.\n",
+            "notes.txt": "Tip: 'pwd' tells you where you are, and 'ls' shows you what's around!\n",
         },
     )
 
-    # Sector 2: The Datastream
-    quests[2] = Quest(
-        id="quest_sector_2",
-        sector_id=2,
-        sector_name="The Datastream",
-        npc_name="Echo",
-        lore=(
-            "You are traversing the high-speed Datastream bus, "
-            "the central conduit through which packets route across the entire mainframe."
-        ),
+    # -------------------------------------------------------------------------
+    # LEVEL 2: FOLLOW THE PATH (cd, ..)
+    # -------------------------------------------------------------------------
+    quests[1] = Quest(
+        id="level_02",
+        sector_id=1,
+        sector_name="Follow the Path",
+        npc_name="Byte",
+        lore="Look! There is a cozy garden folder right here. Let's step inside and explore it.",
         dialogue=[
-            "The packet density in this sector is dangerously high. Millions of packets are flowing past.",
-            "Construct a new directory folder named 'backup' for stream capture.",
-            "Navigate into your new directory to isolate capture operations.",
-            "Capture telemetry packets into 'packet.dump'.",
+            "Moving between folders is just like walking through rooms in a house.",
+            "Use 'cd' followed by the folder name to step inside!",
         ],
         objectives=[
             Objective(
                 id="obj_2_1",
-                description="Construct an isolated telemetry folder named 'backup'.",
-                hint="Type 'mkdir backup' at the prompt and press Enter to construct the directory.",
-                command="mkdir",
-                syntax="mkdir <directory_name>",
-                explanation="Creates one or more new directories in the filesystem.",
-                predicate_type="file_exists",
-                predicate_target="backup",
-                xp_reward=100,
+                description="Step inside the 'garden' folder using cd garden.",
+                hint="Type 'cd garden' and press Enter to walk into the garden.",
+                command="cd",
+                syntax="cd garden",
+                explanation="Changes your current directory to the garden folder.",
+                predicate_type="cwd_equals",
+                predicate_target="/home/operative/garden",
+                xp_reward=50,
                 hints=[
-                    "Set up an isolated directory folder named 'backup'.",
-                    "Check 'man mkdir' to see how directories are created.",
-                    "Run 'mkdir backup' to make the folder.",
+                    "Use the change directory command 'cd' with 'garden'.",
+                    "Remember to put a space after 'cd'.",
+                    "Type: cd garden",
                 ],
-                scenario="Establish an isolated directory to avoid cluttering root datastream telemetry.",
+                scenario="There's a folder here. What's inside?",
             ),
             Objective(
                 id="obj_2_2",
-                description="Navigate inside the newly created 'backup' directory.",
-                hint="Type 'cd backup' at the prompt and press Enter to enter the directory.",
+                description="Step back out to your home folder using cd ..",
+                hint="Type 'cd ..' and press Enter to move up one folder level.",
                 command="cd",
-                syntax="cd <directory_path>",
-                explanation="Changes your current working directory to the target directory path.",
+                syntax="cd ..",
+                explanation="'..' refers to the parent folder one level up.",
                 predicate_type="cwd_equals",
-                predicate_target="/home/operative/backup",
-                xp_reward=100,
+                predicate_target="/home/operative",
+                xp_reward=50,
                 hints=[
-                    "Shift your active terminal context into the backup directory.",
-                    "Use the change directory tool 'cd'.",
-                    "Execute 'cd backup'.",
+                    "Two dots (..) represent the folder above you.",
+                    "Type 'cd ..' with a space between cd and ..",
+                    "Type: cd ..",
                 ],
-                scenario="Move your terminal session inside the storage folder.",
-            ),
-            Objective(
-                id="obj_2_3",
-                description="Capture incoming packet streams into 'packet.dump' inside backup.",
-                hint="Type 'touch packet.dump' at the prompt and press Enter to create the capture file.",
-                command="touch",
-                syntax="touch <filename>",
-                explanation="Creates a new file in your current active directory.",
-                predicate_type="file_exists",
-                predicate_target="/home/operative/backup/packet.dump",
-                xp_reward=100,
-                hints=[
-                    "Create packet.dump in your current directory.",
-                    "Use 'touch' with the filename.",
-                    "Run 'touch packet.dump'.",
-                ],
-                scenario="Deploy a stream capture file to store packet telemetry.",
+                scenario="Nice! Now step back out to return to your home base.",
             ),
         ],
         reward_item=Item(
-            id="item_data_cache",
-            name="Data Cache Module",
-            description="An expanded high-speed storage buffer for storing extracted mainframe data.",
-            category="hardware",
-            rarity="uncommon",
+            id="item_shoes",
+            name="Walking Shoes 👟",
+            description="Comfy shoes for walking through directories.",
+            category="clothing",
+            rarity="common",
         ),
-        reward_xp=200,
+        reward_xp=100,
         environment_tree={
-            "summary.txt": (
-                "[DATASTREAM TELEMETRY]\n"
-                "High density traffic dump available.\n"
-                "Stage incoming streams in a dedicated backup folder.\n"
-            ),
-            "traffic.log": (
-                "[04:10:00] TCP 192.168.1.1:443 -> 10.0.0.1:8080 ACK\n"
-                "[04:12:15] UDP 192.168.1.5:53 -> 8.8.8.8:53 QUERY\n"
-                "[04:15:33] CRITICAL_ALERT: Rogue stream signature AUTH_KEY=SIGMA-404-BYPASS\n"
-                "[04:18:22] TCP 192.168.1.10:443 -> 10.0.0.1:8080 ACK\n"
-            ),
+            "garden": {
+                "flowers.txt": "Sunflowers, daisies, and lavender grow here peacefully. 🌸\n",
+                "bench.txt": "A warm wooden bench where you can sit and code.\n",
+            },
         },
     )
 
-    # Sector 3: Execution Core
-    quests[3] = Quest(
-        id="quest_sector_3",
-        sector_id=3,
-        sector_name="Execution Core",
-        npc_name="Logic",
-        lore=(
-            "You have reached the Execution Core, the high-privilege engine "
-            "where system automation daemons and background tasks run."
-        ),
+    # -------------------------------------------------------------------------
+    # LEVEL 3: READ THE NOTE (cat, less)
+    # -------------------------------------------------------------------------
+    quests[2] = Quest(
+        id="level_03",
+        sector_id=2,
+        sector_name="Read the Note",
+        npc_name="Penny",
+        lore="Someone left a friendly letter named 'welcome.txt' on the desk. Let's read what it says!",
         dialogue=[
-            "We located an automation script named 'run.sh', but its execution permissions have been locked.",
-            "Restore read, write, and execute permissions (755) to 'run.sh' using chmod.",
-            "Secure 'firewall.log' by setting permissions to owner-only read/write (chmod 600).",
-            "Generate an operative countermeasure script named 'exploit.sh'.",
+            "Hi there! I'm Penny the archivist.",
+            "You can read text files directly on your screen using 'cat' or 'less'.",
         ],
         objectives=[
             Objective(
                 id="obj_3_1",
-                description="Restore executable permissions (755) to the automation script 'run.sh' using chmod.",
-                hint="Type 'chmod 755 /home/operative/run.sh' or navigate back home and run 'chmod 755 run.sh'.",
-                command="chmod",
-                syntax="chmod 755 <filename>",
-                explanation="Changes file permissions: 7 (rwx owner), 5 (r-x group), 5 (r-x others).",
-                predicate_type="permission_equals",
-                predicate_target="/home/operative/run.sh",
-                predicate_expected="755",
-                xp_reward=150,
+                description="Read the contents of 'welcome.txt' using cat welcome.txt.",
+                hint="Type 'cat welcome.txt' and press Enter to read the note.",
+                command="cat,less",
+                syntax="cat <filename>",
+                explanation="Outputs the text inside a file right onto your terminal.",
+                predicate_type="file_read",
+                predicate_target="welcome.txt",
+                xp_reward=100,
                 hints=[
-                    "Check the file permissions with 'ls -l', then update them.",
-                    "Check 'man chmod' to review octal mode 755 (read, write, execute for owner).",
-                    "Run 'chmod 755 /home/operative/run.sh' or 'chmod 755 run.sh'.",
+                    "The 'cat' command prints file contents to your terminal.",
+                    "Specify the file name after the command.",
+                    "Type: cat welcome.txt",
                 ],
-                scenario="The diagnostic script cannot execute without proper execution permissions.",
-            ),
-            Objective(
-                id="obj_3_2",
-                description="Lock down sensitive security logs by setting permissions on 'firewall.log' to 600.",
-                hint="Type 'chmod 600 /home/operative/firewall.log' at the prompt and press Enter.",
-                command="chmod",
-                syntax="chmod 600 <filename>",
-                explanation="Restricts file access strictly to the owner (rw-------) for high security.",
-                predicate_type="permission_equals",
-                predicate_target="/home/operative/firewall.log",
-                predicate_expected="600",
-                xp_reward=150,
-                hints=[
-                    "Secure firewall.log so only the owner can read or write to it.",
-                    "Mode 600 sets read/write for owner and denies access to group/others.",
-                    "Execute 'chmod 600 /home/operative/firewall.log'.",
-                ],
-                scenario="Prevent unauthorized users from reading system firewall logs.",
-            ),
-            Objective(
-                id="obj_3_3",
-                description="Generate an operative countermeasure script named 'exploit.sh' using touch.",
-                hint="Type 'touch /home/operative/exploit.sh' at the prompt and press Enter.",
-                command="touch",
-                syntax="touch <filename>",
-                explanation="Creates a new script file in the target directory.",
-                predicate_type="file_exists",
-                predicate_target="/home/operative/exploit.sh",
-                xp_reward=150,
-                hints=[
-                    "Create exploit.sh in /home/operative to stage payload delivery.",
-                    "Use 'touch' with the full path or filename.",
-                    "Run 'touch /home/operative/exploit.sh'.",
-                ],
-                scenario="Prepare the exploit script required for penetrating the next sector barrier.",
+                scenario="You found a note! Read it.",
             ),
         ],
         reward_item=Item(
-            id="item_logic_bomb",
-            name="Logic Bomb Exploit",
-            description="A custom-crafted logic bomb payload capable of puncturing mainframe firewall shields.",
-            category="exploit",
-            rarity="epic",
+            id="item_magnifier",
+            name="Magnifying Glass 🔍",
+            description="Helps you inspect file contents with ease.",
+            category="tool",
+            rarity="uncommon",
         ),
-        reward_xp=300,
+        reward_xp=100,
         environment_tree={
-            "run.sh": {
-                "content": '#!/bin/bash\necho "Execution Core operational."\n',
-                "permissions": 0o644,
-            },
-            "firewall.log": {
-                "content": "ERROR: Security perimeter breached.\nALERT: Sentinel Overlord daemon detected.\n",
-                "permissions": 0o644,
-            },
-            "policy.txt": "Security Policy: Core scripts require 755; security logs require 600.\n",
+            "welcome.txt": "Great job! Reading files is one of the most essential Linux skills.\nKeep exploring! 🌱\n",
         },
     )
 
-    # Sector 4: The Firewall
-    quests[4] = Quest(
-        id="quest_sector_4",
-        sector_id=4,
-        sector_name="The Firewall",
-        npc_name="Aegis",
-        lore=(
-            "You stand before the Firewall, the reinforced perimeter barrier "
-            "that shields the central Sentinel Overlord AI from outside intrusion."
-        ),
+    # -------------------------------------------------------------------------
+    # LEVEL 4: HIDDEN STUFF (ls -a)
+    # -------------------------------------------------------------------------
+    quests[3] = Quest(
+        id="level_04",
+        sector_id=3,
+        sector_name="Hidden Stuff",
+        npc_name="Byte",
+        lore="In Linux, any file that starts with a dot '.' is hidden from regular view. Let's find what's hiding!",
         dialogue=[
-            "The firewall's exterior shields are impenetrable to direct brute-force connections.",
-            "Read through perimeter security records using 'cat /home/operative/firewall.log'.",
-            "Append the bypass key 'BYPASS_ALPHA' to the log using the '>>' redirect operator.",
-            "Construct a dedicated folder for breach exploits at '/home/operative/exploits' using mkdir.",
+            "Normal 'ls' keeps hidden dotfiles out of your way.",
+            "Passing the '-a' flag (all) will reveal everything in the room!",
         ],
         objectives=[
             Objective(
                 id="obj_4_1",
-                description="Inspect the perimeter defense records by reading 'firewall.log' using cat.",
-                hint="Type 'cat /home/operative/firewall.log' at the prompt and press Enter.",
-                command="cat",
-                syntax="cat <filename>",
-                explanation="Concatenates and displays the entire contents of a file to your terminal.",
-                predicate_type="file_exists",
-                predicate_target="/home/operative/firewall.log",
-                xp_reward=200,
+                description="Reveal hidden files using ls -a.",
+                hint="Type 'ls -a' and press Enter to see all files, including dotfiles.",
+                command="ls",
+                syntax="ls -a",
+                explanation="Lists all directory contents, including hidden files beginning with a dot.",
+                predicate_type="pattern_matched",
+                predicate_target="ls",
+                predicate_expected="-a",
+                xp_reward=50,
                 hints=[
-                    "Inspect the defense records stored in firewall.log.",
-                    "Check 'man cat' to see how files are read and output to the terminal.",
-                    "Run 'cat /home/operative/firewall.log'.",
+                    "Use the '-a' flag with 'ls' to show all files.",
+                    "Make sure there is a space between ls and -a.",
+                    "Type: ls -a",
                 ],
-                scenario="Read through the firewall security logs to identify bypass opportunities.",
+                scenario="Someone hid a secret file here. Standard ls won't show it!",
             ),
             Objective(
                 id="obj_4_2",
-                description="Append the bypass code 'BYPASS_ALPHA' to 'firewall.log' using the >> redirect operator.",
-                hint="Type 'echo \"BYPASS_ALPHA\" >> /home/operative/firewall.log' at the prompt and press Enter.",
-                command="echo",
-                syntax="echo <text> >> <filename>",
-                explanation="The >> operator appends output to the end of a file without overwriting it.",
-                predicate_type="file_contains",
-                predicate_target="/home/operative/firewall.log",
-                predicate_expected="BYPASS_ALPHA",
-                xp_reward=200,
+                description="Read the hidden secret recipe using cat .secret_recipe.",
+                hint="Type 'cat .secret_recipe' and press Enter to read the secret.",
+                command="cat,less",
+                syntax="cat .secret_recipe",
+                explanation="Reads the hidden file contents.",
+                predicate_type="file_read",
+                predicate_target=".secret_recipe",
+                xp_reward=50,
                 hints=[
-                    "Append the authorization bypass code to the end of firewall.log.",
-                    "Use 'echo' with the append operator '>>' so previous contents remain intact.",
-                    "Execute 'echo \"BYPASS_ALPHA\" >> /home/operative/firewall.log'.",
+                    "Don't forget the leading dot in the filename!",
+                    "Type: cat .secret_recipe",
+                    "Type: cat .secret_recipe",
                 ],
-                scenario="Inject the bypass authentication key directly into the active firewall stream.",
-            ),
-            Objective(
-                id="obj_4_3",
-                description="Construct a dedicated folder for final breach exploits named '/home/operative/exploits'.",
-                hint="Type 'mkdir -p /home/operative/exploits' at the prompt and press Enter.",
-                command="mkdir",
-                syntax="mkdir -p <path>",
-                explanation="Creates directory path hierarchies, including parent directories as needed (-p).",
-                predicate_type="file_exists",
-                predicate_target="/home/operative/exploits",
-                xp_reward=200,
-                hints=[
-                    "Create the directory path /home/operative/exploits.",
-                    "Check 'man mkdir' to review the -p flag for creating parent folders if needed.",
-                    "Run 'mkdir -p /home/operative/exploits'.",
-                ],
-                scenario="Build a dedicated repository folder for staging root breach tools.",
+                scenario="You spotted the hidden file! Read what is inside.",
             ),
         ],
         reward_item=Item(
-            id="item_shield_breaker",
-            name="Shield Breaker Key",
-            description="A legendary hardware key that disables the Sentinel Overlord's invulnerability shield.",
-            category="exploit",
-            rarity="legendary",
+            id="item_flashlight",
+            name="Pocket Flashlight 🔦",
+            description="Shines bright light onto hidden dotfiles.",
+            category="tool",
+            rarity="uncommon",
         ),
-        reward_xp=400,
+        reward_xp=100,
         environment_tree={
-            "firewall.log": (
-                "DROP packet from 10.0.0.1\n"
-                "ALERT: BREACH_ALERT connection established\n"
-                "PASS packet to 192.168.1.5\n"
-            ),
-            "rules.conf": "Firewall Rule 1: Append bypass key >> to permit passage.\n",
+            ".secret_recipe": "Secret Cookie Recipe: 2 cups flour, 1 cup chocolate chips, lots of love! 🍪\n",
+            "ordinary_list.txt": "Milk, eggs, flour.\n",
         },
     )
 
-    # Sector 5: Sentinel Boss
-    quests[5] = Quest(
-        id="quest_sector_5",
-        sector_id=5,
-        sector_name="Sentinel Overlord",
-        npc_name="Overlord",
-        lore=(
-            "CRITICAL ALERT: You have penetrated the inner sanctum. "
-            "The rogue Sentinel Overlord AI has initiated deletion protocols to purge your operative connection."
-        ),
+    # -------------------------------------------------------------------------
+    # LEVEL 5: FIND IT (find)
+    # -------------------------------------------------------------------------
+    quests[4] = Quest(
+        id="level_05",
+        sector_id=4,
+        sector_name="Find It",
+        npc_name="Fern",
+        lore="A lost key file named 'treasure.txt' is buried deep inside a maze of folders. Let's track it down!",
         dialogue=[
-            "INTRUDER DETECTED. You have reached the core of AEGIS-9.",
-            "Breach my central root chamber with 'cd /root' to challenge administrative control!",
-            "Lock down the rogue daemon by creating '/root/override.lock' with touch.",
-            "Plant the system liberation flag with 'echo \"SYSTEM_RESTORED\" > /root/core.flag'!",
+            "Hello! I'm Fern.",
+            "Instead of clicking through every folder, Linux has a magic wand: the 'find' command!",
         ],
         objectives=[
             Objective(
                 id="obj_5_1",
-                description="Breach the central mainframe root chamber by navigating to '/root'.",
-                hint="Type 'cd /root' at the prompt and press Enter to access the system root chamber.",
-                command="cd",
-                syntax="cd /root",
-                explanation="Navigates directly to the system root administrative directory.",
-                predicate_type="cwd_equals",
-                predicate_target="/root",
-                xp_reward=400,
+                description="Locate 'treasure.txt' anywhere in the current folder using find.",
+                hint="Type 'find . -name \"treasure.txt\"' and press Enter.",
+                command="find",
+                syntax="find . -name \"treasure.txt\"",
+                explanation="Searches the current directory '.' recursively for files matching the pattern.",
+                predicate_type="pattern_matched",
+                predicate_target="find",
+                predicate_expected="treasure.txt",
+                xp_reward=100,
                 hints=[
-                    "Move into the central administrative chamber at /root.",
-                    "Use 'cd' with the target absolute path.",
-                    "Run 'cd /root'.",
+                    "Use 'find .' with the '-name' option.",
+                    "Look for 'treasure.txt'.",
+                    "Type: find . -name \"treasure.txt\"",
                 ],
-                scenario="Access the core administrative chamber where the rogue AI process executes.",
-            ),
-            Objective(
-                id="obj_5_2",
-                description="Establish an administrative security lockfile named '/root/override.lock'.",
-                hint="Type 'touch /root/override.lock' at the prompt and press Enter to lock the core.",
-                command="touch",
-                syntax="touch /root/override.lock",
-                explanation="Creates an administrative override lockfile in the system root chamber.",
-                predicate_type="file_exists",
-                predicate_target="/root/override.lock",
-                xp_reward=400,
-                hints=[
-                    "Create the override.lock file inside /root to halt AI deletion threads.",
-                    "Use 'touch' with the destination path.",
-                    "Execute 'touch /root/override.lock'.",
-                ],
-                scenario="Lock down the rogue deletion daemon before it purges operative telemetry.",
-            ),
-            Objective(
-                id="obj_5_3",
-                description="Plant the liberation flag by writing 'SYSTEM_RESTORED' into '/root/core.flag'.",
-                hint="Type 'echo \"SYSTEM_RESTORED\" > /root/core.flag' at the prompt and press Enter!",
-                command="echo",
-                syntax="echo \"SYSTEM_RESTORED\" > /root/core.flag",
-                explanation="Writes the system liberation flag to purge the Overlord and free the mainframe.",
-                predicate_type="file_contains",
-                predicate_target="/root/core.flag",
-                predicate_expected="SYSTEM_RESTORED",
-                xp_reward=500,
-                hints=[
-                    "Broadcast the liberation flag code into /root/core.flag.",
-                    "Use 'echo' with the redirect operator '>' to write to the file.",
-                    "Run 'echo \"SYSTEM_RESTORED\" > /root/core.flag'.",
-                ],
-                scenario="Neutralize Sentinel Overlord and liberate the entire corporate mainframe!",
+                scenario="A lost file is buried deep in subfolders. Find where it is!",
             ),
         ],
         reward_item=Item(
-            id="item_root_access",
-            name="Root Access Key",
-            description="Total administrative supremacy over OMNICORP's central mainframe.",
+            id="item_detector",
+            name="Metal Detector 🧭",
+            description="Locates lost files buried across deep subdirectories.",
+            category="tool",
+            rarity="rare",
+        ),
+        reward_xp=100,
+        environment_tree={
+            "chest": {
+                "compartment": {
+                    "deep_pocket": {
+                        "treasure.txt": "You found the hidden treasure! 💎\n",
+                    },
+                },
+            },
+        },
+    )
+
+    # -------------------------------------------------------------------------
+    # LEVEL 6: SEARCH INSIDE (grep)
+    # -------------------------------------------------------------------------
+    quests[5] = Quest(
+        id="level_06",
+        sector_id=5,
+        sector_name="Search Inside",
+        npc_name="Byte",
+        lore="There is a long list of items in 'items.txt'. We need to find the line with the word 'banana'!",
+        dialogue=[
+            "Reading line-by-line is slow.",
+            "The 'grep' command filters through text instantly and prints only matching lines!",
+        ],
+        objectives=[
+            Objective(
+                id="obj_6_1",
+                description="Search for 'banana' in 'items.txt' using grep.",
+                hint="Type 'grep \"banana\" items.txt' and press Enter.",
+                command="grep",
+                syntax="grep \"banana\" items.txt",
+                explanation="Searches for matching text pattern inside a file.",
+                predicate_type="pattern_matched",
+                predicate_target="items.txt",
+                predicate_expected="banana",
+                xp_reward=100,
+                hints=[
+                    "Use 'grep <word> <filename>'.",
+                    "Look for the word 'banana' inside 'items.txt'.",
+                    "Type: grep \"banana\" items.txt",
+                ],
+                scenario="Find the file line containing the word 'banana'.",
+            ),
+        ],
+        reward_item=Item(
+            id="item_catcher",
+            name="Word Catcher 🪤",
+            description="Filters and catches any word across long files.",
+            category="tool",
+            rarity="rare",
+        ),
+        reward_xp=100,
+        environment_tree={
+            "items.txt": "apple\ncherry\nsweet yellow banana\ngrape\nwatermelon\n",
+        },
+    )
+
+    # -------------------------------------------------------------------------
+    # LEVEL 7: COPY & MOVE (cp, mv)
+    # -------------------------------------------------------------------------
+    quests[6] = Quest(
+        id="level_07",
+        sector_id=6,
+        sector_name="Copy & Move",
+        npc_name="Oliver",
+        lore="Let's organize our desk! Make a backup copy of 'drawing.txt' and move 'photo.png' into 'gallery/'.",
+        dialogue=[
+            "Hi! I'm Oliver the organizer.",
+            "'cp' makes a duplicate copy, while 'mv' moves or renames a file.",
+        ],
+        objectives=[
+            Objective(
+                id="obj_7_1",
+                description="Make a copy of 'drawing.txt' named 'drawing_backup.txt' using cp.",
+                hint="Type 'cp drawing.txt drawing_backup.txt' and press Enter.",
+                command="cp",
+                syntax="cp drawing.txt drawing_backup.txt",
+                explanation="Copies source file to destination filename.",
+                predicate_type="file_exists",
+                predicate_target="drawing_backup.txt",
+                xp_reward=50,
+                hints=[
+                    "Use 'cp source destination'.",
+                    "Source is 'drawing.txt', destination is 'drawing_backup.txt'.",
+                    "Type: cp drawing.txt drawing_backup.txt",
+                ],
+                scenario="Duplicate your drawing so you never lose the original.",
+            ),
+            Objective(
+                id="obj_7_2",
+                description="Move 'photo.png' into the 'gallery/' folder using mv.",
+                hint="Type 'mv photo.png gallery/' and press Enter.",
+                command="mv",
+                syntax="mv photo.png gallery/",
+                explanation="Moves a file into a target directory.",
+                predicate_type="file_exists",
+                predicate_target="gallery/photo.png",
+                xp_reward=50,
+                hints=[
+                    "Use 'mv <file> <folder>/'.",
+                    "Move 'photo.png' into 'gallery/'.",
+                    "Type: mv photo.png gallery/",
+                ],
+                scenario="Put the photo away into the gallery folder.",
+            ),
+        ],
+        reward_item=Item(
+            id="item_toolbox",
+            name="Handy Toolbox 🧰",
+            description="Handy tools for moving and copying files effortlessly.",
+            category="tool",
+            rarity="rare",
+        ),
+        reward_xp=100,
+        environment_tree={
+            "drawing.txt": "A cheerful sketch of a green seedling. 🌱\n",
+            "photo.png": "Picture of a peaceful morning sunrise. 🌅\n",
+            "gallery": {},
+        },
+    )
+
+    # -------------------------------------------------------------------------
+    # LEVEL 8: CLEAN UP (rm, mkdir, touch)
+    # -------------------------------------------------------------------------
+    quests[7] = Quest(
+        id="level_08",
+        sector_id=7,
+        sector_name="Clean Up",
+        npc_name="Byte",
+        lore="Let's tidy up! Delete the junk file, make a new 'workspace' folder, and create a 'workspace/todo.txt'.",
+        dialogue=[
+            "A clean workspace is a happy workspace.",
+            "'rm' deletes unwanted files, 'mkdir' creates folders, and 'touch' creates empty files.",
+        ],
+        objectives=[
+            Objective(
+                id="obj_8_1",
+                description="Delete the temporary junk file 'junk.tmp' using rm.",
+                hint="Type 'rm junk.tmp' and press Enter.",
+                command="rm",
+                syntax="rm junk.tmp",
+                explanation="Removes a file from the filesystem.",
+                predicate_type="file_not_exists",
+                predicate_target="junk.tmp",
+                xp_reward=40,
+                hints=[
+                    "Use 'rm' with the filename to delete it.",
+                    "Type: rm junk.tmp",
+                    "Type: rm junk.tmp",
+                ],
+                scenario="Clear away the leftover junk file.",
+            ),
+            Objective(
+                id="obj_8_2",
+                description="Create a new folder named 'workspace' using mkdir.",
+                hint="Type 'mkdir workspace' and press Enter.",
+                command="mkdir",
+                syntax="mkdir workspace",
+                explanation="Creates a new directory folder.",
+                predicate_type="file_exists",
+                predicate_target="workspace",
+                xp_reward=40,
+                hints=[
+                    "Use 'mkdir' to make a new directory.",
+                    "Type: mkdir workspace",
+                    "Type: mkdir workspace",
+                ],
+                scenario="Create a fresh new folder for your projects.",
+            ),
+            Objective(
+                id="obj_8_3",
+                description="Create an empty file 'workspace/todo.txt' using touch.",
+                hint="Type 'touch workspace/todo.txt' and press Enter.",
+                command="touch",
+                syntax="touch workspace/todo.txt",
+                explanation="Creates a new empty file in the workspace directory.",
+                predicate_type="file_exists",
+                predicate_target="workspace/todo.txt",
+                xp_reward=40,
+                hints=[
+                    "Use 'touch' with the destination path.",
+                    "Type: touch workspace/todo.txt",
+                    "Type: touch workspace/todo.txt",
+                ],
+                scenario="Start a new todo list inside your workspace.",
+            ),
+        ],
+        reward_item=Item(
+            id="item_broom",
+            name="Little Broom 🧹",
+            description="Keeps your filesystem spick and span.",
+            category="tool",
+            rarity="rare",
+        ),
+        reward_xp=120,
+        environment_tree={
+            "junk.tmp": "Old temporary scratch notes that are no longer needed.\n",
+        },
+    )
+
+    # -------------------------------------------------------------------------
+    # LEVEL 9: WHO CAN OPEN THIS? (chmod)
+    # -------------------------------------------------------------------------
+    quests[8] = Quest(
+        id="level_09",
+        sector_id=8,
+        sector_name="Who Can Open This?",
+        npc_name="Penny",
+        lore="We have a fun mini-game script 'play.sh', but it doesn't have execute permission yet!",
+        dialogue=[
+            "Every file in Linux has permissions controlling who can Read (r), Write (w), and Execute (x).",
+            "Use 'chmod 755 play.sh' (or 'chmod +x play.sh') to make it executable!",
+        ],
+        objectives=[
+            Objective(
+                id="obj_9_1",
+                description="Make 'play.sh' executable using chmod (755 or +x).",
+                hint="Type 'chmod 755 play.sh' or 'chmod +x play.sh' and press Enter.",
+                command="chmod",
+                syntax="chmod 755 play.sh",
+                explanation="Grants read and execute permissions to a script file.",
+                predicate_type="permission_equals",
+                predicate_target="play.sh",
+                predicate_expected="755",
+                xp_reward=100,
+                hints=[
+                    "Use 'chmod' to change permissions.",
+                    "Mode 755 makes a script readable and executable.",
+                    "Type: chmod 755 play.sh",
+                ],
+                scenario="Fix the permissions so everyone can run the play script.",
+            ),
+        ],
+        reward_item=Item(
+            id="item_brass_key",
+            name="Brass Permission Key 🗝️",
+            description="Unlocks the right permissions on any script.",
+            category="tool",
+            rarity="epic",
+        ),
+        reward_xp=100,
+        environment_tree={
+            "play.sh": {
+                "content": "#!/bin/bash\necho '🎉 Let the games begin!'\n",
+                "permissions": 0o644,
+            },
+        },
+    )
+
+    # -------------------------------------------------------------------------
+    # LEVEL 10: COUNT & SORT (wc, sort)
+    # -------------------------------------------------------------------------
+    quests[9] = Quest(
+        id="level_10",
+        sector_id=9,
+        sector_name="Count & Sort",
+        npc_name="Oliver",
+        lore="Let's process some data! Count the lines in 'guestbook.txt' and sort 'names.txt' alphabetically.",
+        dialogue=[
+            "'wc -l' counts the number of lines in a file.",
+            "'sort' puts lines in clean alphabetical order!",
+        ],
+        objectives=[
+            Objective(
+                id="obj_10_1",
+                description="Count how many lines are in 'guestbook.txt' using wc -l.",
+                hint="Type 'wc -l guestbook.txt' and press Enter.",
+                command="wc",
+                syntax="wc -l guestbook.txt",
+                explanation="Counts total newline lines in a text file.",
+                predicate_type="pattern_matched",
+                predicate_target="guestbook.txt",
+                predicate_expected="guestbook.txt",
+                xp_reward=50,
+                hints=[
+                    "Use 'wc -l <filename>'.",
+                    "Type: wc -l guestbook.txt",
+                    "Type: wc -l guestbook.txt",
+                ],
+                scenario="Find out how many guests signed the book.",
+            ),
+            Objective(
+                id="obj_10_2",
+                description="Sort 'names.txt' in alphabetical order using sort.",
+                hint="Type 'sort names.txt' and press Enter.",
+                command="sort",
+                syntax="sort names.txt",
+                explanation="Sorts lines in text file alphabetically.",
+                predicate_type="pattern_matched",
+                predicate_target="names.txt",
+                predicate_expected="names.txt",
+                xp_reward=50,
+                hints=[
+                    "Use 'sort <filename>'.",
+                    "Type: sort names.txt",
+                    "Type: sort names.txt",
+                ],
+                scenario="Order the names alphabetically from A to Z.",
+            ),
+        ],
+        reward_item=Item(
+            id="item_abacus",
+            name="Polished Abacus 🧮",
+            description="Counts lines and organizes numbers with ease.",
+            category="tool",
+            rarity="epic",
+        ),
+        reward_xp=100,
+        environment_tree={
+            "guestbook.txt": "Alice\nBob\nCharlie\nDiana\nEvan\n",
+            "names.txt": "Zoe\nCharlie\nAlice\nBob\n",
+        },
+    )
+
+    # -------------------------------------------------------------------------
+    # LEVEL 11: CONNECT THE COMMANDS (pipes |)
+    # -------------------------------------------------------------------------
+    quests[10] = Quest(
+        id="level_11",
+        sector_id=10,
+        sector_name="Connect the Commands",
+        npc_name="Byte",
+        lore="The pipe operator '|' is one of Linux's greatest superpowers! It connects command output directly into the next command.",
+        dialogue=[
+            "Imagine a physical pipe carrying water from one tool straight into another.",
+            "Try: cat animals.txt | grep \"cat\" to filter animals!",
+        ],
+        objectives=[
+            Objective(
+                id="obj_11_1",
+                description="Connect commands with a pipe: search for 'cat' in 'animals.txt'.",
+                hint="Type 'cat animals.txt | grep \"cat\"' and press Enter.",
+                command="cat,grep",
+                syntax="cat animals.txt | grep \"cat\"",
+                explanation="Pipes standard output of cat into standard input of grep.",
+                predicate_type="pipeline_used",
+                predicate_target="cat",
+                predicate_expected="cat",
+                xp_reward=100,
+                hints=[
+                    "Use the pipe symbol '|' between the two commands.",
+                    "Try: cat animals.txt | grep \"cat\"",
+                    "Type: cat animals.txt | grep \"cat\"",
+                ],
+                scenario="Chain two commands together with a pipe.",
+            ),
+        ],
+        reward_item=Item(
+            id="item_funnel",
+            name="Magic Pipe Funnel 🌪️",
+            description="Channels output from one tool straight into another.",
+            category="tool",
+            rarity="epic",
+        ),
+        reward_xp=100,
+        environment_tree={
+            "animals.txt": "dog\ncat\nbird\nwild cat\nfish\nblack cat\n",
+        },
+    )
+
+    # -------------------------------------------------------------------------
+    # LEVEL 12: REDIRECT IT (>, >>, <)
+    # -------------------------------------------------------------------------
+    quests[11] = Quest(
+        id="level_12",
+        sector_id=11,
+        sector_name="Redirect It",
+        npc_name="Penny",
+        lore="Instead of printing text on screen, '>' saves it into a file, and '>>' appends more to it!",
+        dialogue=[
+            "'>' sends text into a file (creating or replacing it).",
+            "'>>' appends text to the end without erasing what was already there.",
+        ],
+        objectives=[
+            Objective(
+                id="obj_12_1",
+                description="Save 'Hello Linux' into 'greeting.txt' using echo \"Hello Linux\" > greeting.txt.",
+                hint="Type 'echo \"Hello Linux\" > greeting.txt' and press Enter.",
+                command="echo",
+                syntax="echo \"Hello Linux\" > greeting.txt",
+                explanation="Redirects output into greeting.txt.",
+                predicate_type="file_contains",
+                predicate_target="greeting.txt",
+                predicate_expected="Hello Linux",
+                xp_reward=50,
+                hints=[
+                    "Use '>' to write into greeting.txt.",
+                    "Type: echo \"Hello Linux\" > greeting.txt",
+                    "Type: echo \"Hello Linux\" > greeting.txt",
+                ],
+                scenario="Create a greeting file with the > redirect operator.",
+            ),
+            Objective(
+                id="obj_12_2",
+                description="Append 'Have fun!' to 'greeting.txt' using echo \"Have fun!\" >> greeting.txt.",
+                hint="Type 'echo \"Have fun!\" >> greeting.txt' and press Enter.",
+                command="echo",
+                syntax="echo \"Have fun!\" >> greeting.txt",
+                explanation="Appends text to the end of greeting.txt without overwriting.",
+                predicate_type="file_contains",
+                predicate_target="greeting.txt",
+                predicate_expected="Have fun!",
+                xp_reward=50,
+                hints=[
+                    "Use '>>' to append to greeting.txt.",
+                    "Type: echo \"Have fun!\" >> greeting.txt",
+                    "Type: echo \"Have fun!\" >> greeting.txt",
+                ],
+                scenario="Add a friendly second line to your greeting file.",
+            ),
+        ],
+        reward_item=Item(
+            id="item_quill",
+            name="Quill & Ink 🖋️",
+            description="Writes and redirects your thoughts into files.",
+            category="tool",
+            rarity="epic",
+        ),
+        reward_xp=100,
+        environment_tree={
+            "notes.txt": "Tip: '>' creates or overwrites, '>>' adds to the end.\n",
+        },
+    )
+
+    # -------------------------------------------------------------------------
+    # LEVEL 13: SEARCH + PIPE (find, grep, |)
+    # -------------------------------------------------------------------------
+    quests[12] = Quest(
+        id="level_13",
+        sector_id=12,
+        sector_name="Search + Pipe",
+        npc_name="Nova",
+        lore="Let's combine what we've learned: use 'find' to locate all '.txt' files and pipe them to 'grep' for 'clue'!",
+        dialogue=[
+            "Hello! I'm Nova.",
+            "When you combine search tools with pipes, you can inspect hundreds of files in seconds!",
+        ],
+        objectives=[
+            Objective(
+                id="obj_13_1",
+                description="Find text files and filter for 'clue' using find . -name \"*.txt\" | grep \"clue\".",
+                hint="Type 'find . -name \"*.txt\" | grep \"clue\"' and press Enter.",
+                command="find,grep",
+                syntax="find . -name \"*.txt\" | grep \"clue\"",
+                explanation="Finds text files recursively and pipes results into grep filter.",
+                predicate_type="pipeline_used",
+                predicate_target="find",
+                predicate_expected="clue",
+                xp_reward=100,
+                hints=[
+                    "Start with 'find . -name \"*.txt\"'.",
+                    "Pipe into 'grep \"clue\"'.",
+                    "Type: find . -name \"*.txt\" | grep \"clue\"",
+                ],
+                scenario="Combine find and grep to spot clue files across directories.",
+            ),
+        ],
+        reward_item=Item(
+            id="item_spyglass",
+            name="Super Spyglass 🔭",
+            description="Finds and filters simultaneously across all folders.",
+            category="tool",
+            rarity="legendary",
+        ),
+        reward_xp=100,
+        environment_tree={
+            "docs": {
+                "clue1.txt": "First piece of the puzzle: follow the sunshine.\n",
+                "story.txt": "A relaxing bedtime story about a little robot.\n",
+                "clue2.txt": "Second piece of the puzzle: look in the attic.\n",
+            },
+        },
+    )
+
+    # -------------------------------------------------------------------------
+    # LEVEL 14: THE BIG MESS (Multi-step exploration)
+    # -------------------------------------------------------------------------
+    quests[13] = Quest(
+        id="level_14",
+        sector_id=13,
+        sector_name="The Big Mess",
+        npc_name="Fern",
+        lore="We have arrived in the dusty attic! It's a real mess with folders, hidden notes, and locked scripts.",
+        dialogue=[
+            "This room brings together navigation, hidden files, and permissions.",
+            "Explore step-by-step and uncover the secret!",
+        ],
+        objectives=[
+            Objective(
+                id="obj_14_1",
+                description="Step inside the 'attic' folder using cd attic.",
+                hint="Type 'cd attic' and press Enter.",
+                command="cd",
+                syntax="cd attic",
+                explanation="Enters the attic directory.",
+                predicate_type="cwd_equals",
+                predicate_target="/home/operative/attic",
+                xp_reward=50,
+                hints=[
+                    "Navigate into the attic.",
+                    "Type: cd attic",
+                    "Type: cd attic",
+                ],
+                scenario="Walk inside the attic room.",
+            ),
+            Objective(
+                id="obj_14_2",
+                description="Read the hidden note '.secret_note' using cat .secret_note.",
+                hint="Type 'cat .secret_note' and press Enter.",
+                command="cat,less",
+                syntax="cat .secret_note",
+                explanation="Reads the hidden clue note.",
+                predicate_type="file_read",
+                predicate_target=".secret_note",
+                xp_reward=50,
+                hints=[
+                    "Remember to include the leading dot for hidden files!",
+                    "Type: cat .secret_note",
+                    "Type: cat .secret_note",
+                ],
+                scenario="Read the hidden note tucked away in the corner.",
+            ),
+            Objective(
+                id="obj_14_3",
+                description="Make 'solve.sh' executable using chmod (755 or +x).",
+                hint="Type 'chmod 755 solve.sh' or 'chmod +x solve.sh' and press Enter.",
+                command="chmod",
+                syntax="chmod 755 solve.sh",
+                explanation="Grants execute permission to solve.sh.",
+                predicate_type="permission_equals",
+                predicate_target="solve.sh",
+                predicate_expected="755",
+                xp_reward=50,
+                hints=[
+                    "Use 'chmod 755 solve.sh' or 'chmod +x solve.sh'.",
+                    "Type: chmod 755 solve.sh",
+                    "Type: chmod 755 solve.sh",
+                ],
+                scenario="Fix permissions on the attic puzzle solver.",
+            ),
+        ],
+        reward_item=Item(
+            id="item_trophy_box",
+            name="Organizer Medal 🎖️",
+            description="Proof that you conquered the big messy room!",
+            category="badge",
+            rarity="legendary",
+        ),
+        reward_xp=150,
+        environment_tree={
+            "attic": {
+                ".secret_note": "The magic word is SUNSHINE! Keep it in mind for the final challenge.\n",
+                "solve.sh": {
+                    "content": "#!/bin/bash\necho 'Attic mystery cleared!'\n",
+                    "permissions": 0o644,
+                },
+                "boxes": {
+                    "album.txt": "Old photos and warm memories.\n",
+                },
+            },
+        },
+    )
+
+    # -------------------------------------------------------------------------
+    # LEVEL 15: FINAL CHALLENGE (The Ultimate Exploration Puzzle)
+    # -------------------------------------------------------------------------
+    quests[14] = Quest(
+        id="level_15",
+        sector_id=14,
+        sector_name="The Final Challenge",
+        npc_name="Byte",
+        lore="The final adventure puzzle! Combine your skills: read the briefing, find the hidden star in the maze, and record your victory!",
+        dialogue=[
+            "You have learned so much on this journey.",
+            "Now it's time for the final challenge: follow the clues, track down the golden star, and claim your victory!",
+        ],
+        objectives=[
+            Objective(
+                id="obj_15_1",
+                description="Read 'start_here.txt' to get your final mission briefing.",
+                hint="Type 'cat start_here.txt' and press Enter.",
+                command="cat,less",
+                syntax="cat start_here.txt",
+                explanation="Reads the final puzzle instructions.",
+                predicate_type="file_read",
+                predicate_target="start_here.txt",
+                xp_reward=50,
+                hints=[
+                    "Read the starting instructions file.",
+                    "Type: cat start_here.txt",
+                    "Type: cat start_here.txt",
+                ],
+                scenario="Inspect the clue instructions on your desk.",
+            ),
+            Objective(
+                id="obj_15_2",
+                description="Locate 'star.txt' hidden in the maze using find . -name \"star.txt\".",
+                hint="Type 'find . -name \"star.txt\"' and press Enter.",
+                command="find",
+                syntax="find . -name \"star.txt\"",
+                explanation="Locates the star file inside the maze directory.",
+                predicate_type="pattern_matched",
+                predicate_target="find",
+                predicate_expected="star.txt",
+                xp_reward=75,
+                hints=[
+                    "Use find to search all subfolders for 'star.txt'.",
+                    "Type: find . -name \"star.txt\"",
+                    "Type: find . -name \"star.txt\"",
+                ],
+                scenario="Find where the Golden Star is resting in the maze.",
+            ),
+            Objective(
+                id="obj_15_3",
+                description="Write 'I_LOVE_LINUX' into 'trophy.txt' to complete your adventure!",
+                hint="Type 'echo \"I_LOVE_LINUX\" > trophy.txt' and press Enter!",
+                command="echo",
+                syntax="echo \"I_LOVE_LINUX\" > trophy.txt",
+                explanation="Writes the victory passphrase to complete the game.",
+                predicate_type="file_contains",
+                predicate_target="trophy.txt",
+                predicate_expected="I_LOVE_LINUX",
+                xp_reward=100,
+                hints=[
+                    "Use 'echo \"I_LOVE_LINUX\" > trophy.txt'.",
+                    "Make sure the text matches exactly: I_LOVE_LINUX",
+                    "Type: echo \"I_LOVE_LINUX\" > trophy.txt",
+                ],
+                scenario="Claim your victory and complete the final challenge!",
+            ),
+        ],
+        reward_item=Item(
+            id="item_golden_star",
+            name="Golden Linux Star ⭐",
+            description="Awarded to true terminal adventurers who mastered all 15 levels!",
             category="artifact",
             rarity="mythic",
         ),
-        reward_xp=1000,
+        reward_xp=250,
         environment_tree={
-            "/root": {
-                "overlord.conf": (
-                    "[SENTINEL OVERLORD CONTROL CORE]\n"
-                    "STATUS: HOSTILE_TAKEOVER\n"
-                    "OVERRIDE_PASSPHRASE=\"SYSTEM_RESTORED\"\n"
-                ),
-                "daemon.lock": "DAEMON LOCK ACTIVE\n",
+            "start_here.txt": (
+                "Welcome to the Final Challenge! 🌟\n"
+                "Step 1: Use 'find . -name \"star.txt\"' to locate where the Golden Star is.\n"
+                "Step 2: Read what the star says!\n"
+                "Step 3: Write 'I_LOVE_LINUX' into 'trophy.txt' using '>' to claim your trophy!\n"
+            ),
+            "maze": {
+                "hallway": {
+                    "room_a": {
+                        "star.txt": "⭐ You found the Golden Star! Write 'I_LOVE_LINUX' into 'trophy.txt' to win!\n",
+                    },
+                },
             },
         },
     )

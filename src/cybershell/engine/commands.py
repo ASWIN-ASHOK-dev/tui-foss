@@ -35,6 +35,8 @@ class ShellCommands:
             "chmod": self.chmod,
             "grep": self.grep,
             "wc": self.wc,
+            "sort": self.sort,
+            "less": self.less,
             "find": self.find,
             "man": self.man,
             "lookup": self.lookup,
@@ -251,7 +253,14 @@ class ShellCommands:
             return CommandResult(stderr="chmod: missing operand\n", exit_code=1)
         mode, paths = args[0], args[1:]
         for path in paths:
-            self.vfs.chmod(path, mode)
+            if mode in ("+x", "a+x", "u+x"):
+                node = self.vfs.get_node(path)
+                if node is not None:
+                    node.permissions = (node.permissions | 0o111) & 0o777
+                else:
+                    self.vfs.chmod(path, "755")
+            else:
+                self.vfs.chmod(path, mode)
         return CommandResult()
 
     def grep(self, args: Sequence[str], stdin: str = "") -> CommandResult:
@@ -290,6 +299,45 @@ class ShellCommands:
         if isinstance(content, CommandResult):
             return content
         return CommandResult(stdout=f"{content.count(chr(10))}\n")
+
+    def sort(self, args: Sequence[str], stdin: str = "") -> CommandResult:
+        reverse = False
+        numeric = False
+        unique = False
+        paths: List[str] = []
+        for arg in args:
+            if arg.startswith("-") and arg != "-":
+                flags = arg[1:]
+                if "r" in flags:
+                    reverse = True
+                if "n" in flags:
+                    numeric = True
+                if "u" in flags:
+                    unique = True
+            else:
+                paths.append(arg)
+        content = self._read_inputs(paths, stdin, "sort")
+        if isinstance(content, CommandResult):
+            return content
+        lines = [line for line in content.splitlines(keepends=True)]
+        if unique:
+            lines = list(dict.fromkeys(lines))
+        if numeric:
+            def _num_key(line: str):
+                parts = line.strip().split()
+                if parts:
+                    try:
+                        return (0, float(parts[0]))
+                    except ValueError:
+                        return (1, parts[0])
+                return (2, "")
+            lines.sort(key=_num_key, reverse=reverse)
+        else:
+            lines.sort(reverse=reverse)
+        return CommandResult(stdout="".join(lines), exit_code=0)
+
+    def less(self, args: Sequence[str], stdin: str = "") -> CommandResult:
+        return self.cat(args, stdin)
 
     def find(self, args: Sequence[str], stdin: str = "") -> CommandResult:
         import fnmatch
@@ -361,18 +409,17 @@ class ShellCommands:
             return self.man(args, stdin)
         commands = sorted(self._commands.keys())
         lines = [
-            "CYBERSHELL TACTICAL COMMAND SUITE",
-            "Core filesystem tools:",
-            f"  {', '.join(commands[:10])}",
-            f"  {', '.join(commands[10:])}",
+            "🌱 BYTE'S LINUX COMMAND GUIDE",
+            "Available commands:",
+            f"  {', '.join(commands[:11])}",
+            f"  {', '.join(commands[11:])}",
             "",
-            "Command Learning System:",
-            "  man <cmd>     - Concise beginner-friendly manual page (e.g. 'man ls')",
-            "  lookup <cmd>  - Syntax & flag lookup (alias for man)",
-            "  hint          - Request progressive clues for the current objective",
-            "  status        - View operative stats, streak, score, and badges",
-            "  clear         - Wipe terminal stream",
+            "Helpful Tools:",
+            "  man <cmd>     - Short friendly guide for a command (e.g. 'man ls')",
+            "  ? / hint      - Friendly hints for your current objective",
+            "  map           - Show your adventure progress across all 15 levels",
+            "  clear         - Clear the screen",
             "",
-            "Experiment freely! Typos and unknown commands do not damage your system.",
+            "Explore freely! Mistakes are completely okay and safe 🌱",
         ]
         return CommandResult(stdout="\n".join(lines) + "\n", exit_code=0)

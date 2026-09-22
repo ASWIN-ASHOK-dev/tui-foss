@@ -1,7 +1,6 @@
-"""
-CyberShell TUI renderer.
+"""Byte's Linux Adventure - TUI Renderer.
 
-Provides terminal-safe utilities and fixed-frame rendering helpers.
+Provides friendly terminal-safe utilities, rounded cards, and clean HUD elements.
 """
 
 from __future__ import annotations
@@ -12,20 +11,21 @@ from typing import Iterable, List, Tuple
 
 ANSI_ESCAPE_RE = re.compile(r"\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 
-# Unicode box-drawing characters used by the CyberShell UI.
-TOP_LEFT = "╔"
-TOP_RIGHT = "╗"
-BOTTOM_LEFT = "╚"
-BOTTOM_RIGHT = "╝"
-HORIZONTAL = "═"
-VERTICAL = "║"
-
+# Rounded box characters for soft, friendly cards
 PANEL_TOP_LEFT = "╭"
 PANEL_TOP_RIGHT = "╮"
 PANEL_BOTTOM_LEFT = "╰"
 PANEL_BOTTOM_RIGHT = "╯"
 PANEL_HORIZONTAL = "─"
 PANEL_VERTICAL = "│"
+
+# Kept for compatibility
+TOP_LEFT = "╭"
+TOP_RIGHT = "╮"
+BOTTOM_LEFT = "╰"
+BOTTOM_RIGHT = "╯"
+HORIZONTAL = "─"
+VERTICAL = "│"
 
 
 def strip_ansi(text: str) -> str:
@@ -39,11 +39,7 @@ def visual_len(text: str) -> int:
 
 
 def truncate_styled(text: str, max_width: int, suffix: str = "…") -> str:
-    """
-    Truncate styled text to a visible terminal width.
-
-    ANSI escape sequences are preserved while calculating width.
-    """
+    """Truncate styled text to a visible terminal width while preserving ANSI sequences."""
     if max_width <= 0:
         return ""
 
@@ -51,7 +47,6 @@ def truncate_styled(text: str, max_width: int, suffix: str = "…") -> str:
         return text
 
     suffix_width = visual_len(suffix)
-
     if suffix_width >= max_width:
         return suffix[:max_width]
 
@@ -62,12 +57,10 @@ def truncate_styled(text: str, max_width: int, suffix: str = "…") -> str:
 
     while index < len(text) and visible_width < target_width:
         match = ANSI_ESCAPE_RE.match(text, index)
-
         if match:
             result.append(match.group())
             index = match.end()
             continue
-
         result.append(text[index])
         visible_width += 1
         index += 1
@@ -84,7 +77,6 @@ def terminal_size(default_width: int = 80, default_height: int = 24) -> Tuple[in
 def pad_to_width(text: str, width: int, align: str = "left") -> str:
     """Pad visible text to exactly the requested terminal width."""
     text = str(text)
-
     if width <= 0:
         return ""
 
@@ -92,21 +84,101 @@ def pad_to_width(text: str, width: int, align: str = "left") -> str:
         text = truncate_styled(text, width)
 
     padding = width - visual_len(text)
-
     if align == "right":
         return " " * padding + text
-
     if align == "center":
         left = padding // 2
         right = padding - left
         return " " * left + text + " " * right
-
     return text + " " * padding
 
 
-def horizontal_line(width: int, character: str = HORIZONTAL) -> str:
+def horizontal_line(width: int, character: str = PANEL_HORIZONTAL) -> str:
     """Create a fixed-width horizontal line."""
     return character * max(0, width)
+
+
+def draw_compact_hud(
+    character_name: str = "Byte",
+    level_num: int = 1,
+    sector_name: str = "Look Around",
+    xp: int = 0,
+    streak: int = 0,
+    objective_desc: str = "",
+    hp: int = 100,
+    max_hp: int = 100,
+    width: int = 80,
+    styled: bool = True,
+    total_levels: int = 15,
+) -> str:
+    """Render the friendly, minimalist rounded card HUD."""
+    card_width = min(max(40, width - 4), 68)
+    inner_width = card_width - 2
+
+    title_left = f"🌱 {character_name}'s Adventure" if character_name else "🌱 Linux Adventure"
+    title_right = f"Level {level_num:02d}/{total_levels:02d}"
+
+    space_l1 = max(1, inner_width - visual_len(title_left) - visual_len(title_right))
+    if styled:
+        l1_content = f"\033[1;92m{title_left}\033[0m" + (" " * space_l1) + f"\033[1;93m{title_right}\033[0m"
+    else:
+        l1_content = title_left + (" " * space_l1) + title_right
+    l1_padded = pad_to_width(l1_content, inner_width)
+
+    # Line 2: Level name on left, XP / streak on right
+    name_clean = sector_name.title()
+    xp_clean = f"⭐ {xp} XP"
+    if streak > 0:
+        xp_clean += f" • 🔥 {streak}"
+    space_l2 = max(1, inner_width - visual_len(name_clean) - visual_len(xp_clean))
+    if styled:
+        l2_content = f"\033[1;97m{name_clean}\033[0m" + (" " * space_l2) + f"\033[1;93m{xp_clean}\033[0m"
+    else:
+        l2_content = name_clean + (" " * space_l2) + xp_clean
+    l2_padded = pad_to_width(l2_content, inner_width)
+
+    # Line 3: Objective inside the card
+    obj_str = objective_desc.strip()
+    if not obj_str.startswith("🎯"):
+        obj_str = f"🎯 {obj_str}"
+    if visual_len(obj_str) > inner_width:
+        obj_str = truncate_styled(obj_str, inner_width)
+    if styled:
+        l3_content = f"\033[1;92m{obj_str}\033[0m"
+    else:
+        l3_content = obj_str
+    l3_padded = pad_to_width(l3_content, inner_width)
+
+    b_col = "\033[92m" if styled else ""
+    b_rst = "\033[0m" if styled else ""
+
+    box_lines = [
+        f"{b_col}{PANEL_TOP_LEFT}{PANEL_HORIZONTAL * inner_width}{PANEL_TOP_RIGHT}{b_rst}",
+        f"{b_col}{PANEL_VERTICAL}{b_rst}{l1_padded}{b_col}{PANEL_VERTICAL}{b_rst}",
+        f"{b_col}{PANEL_VERTICAL}{b_rst}{l2_padded}{b_col}{PANEL_VERTICAL}{b_rst}",
+        f"{b_col}{PANEL_VERTICAL}{b_rst}{l3_padded}{b_col}{PANEL_VERTICAL}{b_rst}",
+        f"{b_col}{PANEL_BOTTOM_LEFT}{PANEL_HORIZONTAL * inner_width}{PANEL_BOTTOM_RIGHT}{b_rst}",
+    ]
+
+    return "\n".join(box_lines)
+
+
+def draw_control_footer(
+    screen_type: str = "terminal",
+    width: int = 80,
+    styled: bool = True,
+) -> str:
+    """Render a context-sensitive footer showing available controls."""
+    if screen_type == "terminal":
+        text = "ENTER Run    ↑↓ History    ESC Menu    ? Help"
+    elif screen_type == "menu":
+        text = "↑↓ Select    ENTER Choose    ESC Back"
+    else:
+        text = "ENTER Continue    ESC Back"
+
+    if styled:
+        return f"\033[2m{text}\033[0m"
+    return text
 
 
 def draw_double_header(
@@ -118,45 +190,21 @@ def draw_double_header(
     width: int = 80,
     styled: bool = False,
 ) -> str:
-    """
-    Render the CyberShell top HUD using a double border.
-
-    The returned string contains exactly four terminal lines.
-    """
-    width = max(20, width)
-
+    """Render a clean rounded header card for information and tool screens."""
+    width = max(24, width)
     inner_width = width - 2
 
-    hp = max(0, hp)
-    max_hp = max(1, max_hp)
-    hp_percent = min(100, int((hp / max_hp) * 100))
-
-    hp_bar_width = 10
-    hp_filled = round(hp_bar_width * hp_percent / 100)
-    hp_bar = "█" * hp_filled + "░" * (hp_bar_width - hp_filled)
+    title_left = "🌱 BYTE'S LINUX ADVENTURE"
+    title_right = f"⭐ {xp} XP"
+    space = max(1, inner_width - visual_len(title_left) - visual_len(title_right))
 
     if styled:
-        if hp_percent > 50:
-            hp_color = "\033[92m"  # Bright Green
-        elif hp_percent > 20:
-            hp_color = "\033[93m"  # Bright Yellow
-        else:
-            hp_color = "\033[91m"  # Bright Red
-
-        line_one = (
-            f"\033[1;96mOPERATIVE:\033[0m \033[1;97m{character_name}\033[0m"
-            f"    \033[1;97mHP:\033[0m [{hp_color}{hp_bar}\033[0m] \033[1;97m{hp_percent:>3}%\033[0m"
-            f"    \033[1;95mXP:\033[0m \033[1;97m{xp}\033[0m"
-        )
-        line_two = f"\033[1;93m{sector_title}\033[0m"
-        b_col = "\033[96m"
+        line_one = f"\033[1;92m{title_left}\033[0m" + (" " * space) + f"\033[1;93m{title_right}\033[0m"
+        line_two = f"\033[1;97m{sector_title}\033[0m"
+        b_col = "\033[92m"
         b_rst = "\033[0m"
     else:
-        line_one = (
-            f"OPERATIVE: {character_name}"
-            f"    HP: [{hp_bar}] {hp_percent:>3}%"
-            f"    XP: {xp}"
-        )
+        line_one = title_left + (" " * space) + title_right
         line_two = sector_title
         b_col = ""
         b_rst = ""
@@ -166,65 +214,12 @@ def draw_double_header(
 
     return "\n".join(
         [
-            b_col + TOP_LEFT + horizontal_line(inner_width) + TOP_RIGHT + b_rst,
-            b_col + VERTICAL + b_rst + line_one + b_col + VERTICAL + b_rst,
-            b_col + VERTICAL + b_rst + line_two + b_col + VERTICAL + b_rst,
-            b_col + BOTTOM_LEFT + horizontal_line(inner_width) + BOTTOM_RIGHT + b_rst,
+            b_col + PANEL_TOP_LEFT + horizontal_line(inner_width) + PANEL_TOP_RIGHT + b_rst,
+            b_col + PANEL_VERTICAL + b_rst + line_one + b_col + PANEL_VERTICAL + b_rst,
+            b_col + PANEL_VERTICAL + b_rst + line_two + b_col + PANEL_VERTICAL + b_rst,
+            b_col + PANEL_BOTTOM_LEFT + horizontal_line(inner_width) + PANEL_BOTTOM_RIGHT + b_rst,
         ]
     )
-
-
-def draw_compact_hud(
-    character_name: str,
-    level_num: int,
-    sector_name: str,
-    xp: int,
-    streak: int = 0,
-    objective_desc: str = "",
-    hp: int = 100,
-    max_hp: int = 100,
-    width: int = 80,
-    styled: bool = True,
-) -> str:
-    """Render a compact 4-line terminal HUD for exploration gameplay."""
-    width = max(40, width)
-    inner_width = width - 2
-
-    streak_str = f" 🔥 {streak}" if streak > 1 else ""
-    if styled:
-        line_one = (
-            f"\033[1;96mOPERATIVE:\033[0m \033[1;97m{character_name}\033[0m  │  "
-            f"\033[1;92mHP:\033[0m \033[1;97m{hp}/{max_hp}\033[0m  │  "
-            f"\033[1;93mLEVEL {level_num:02d}: {sector_name.upper()}\033[0m  │  "
-            f"\033[1;95mXP:\033[0m \033[1;97m{xp}\033[0m"
-            f"\033[1;91m{streak_str}\033[0m"
-        )
-        line_two = f"\033[1;92m🎯 OBJECTIVE:\033[0m \033[1;97m{objective_desc}\033[0m"
-        b_col = "\033[96m"
-        b_rst = "\033[0m"
-    else:
-        line_one = (
-            f"OPERATIVE: {character_name}  |  "
-            f"HP: {hp}/{max_hp}  |  "
-            f"LEVEL {level_num:02d}: {sector_name.upper()}  |  "
-            f"XP: {xp}{streak_str}"
-        )
-        line_two = f"OBJECTIVE: {objective_desc}"
-        b_col = ""
-        b_rst = ""
-
-    line_one = pad_to_width(truncate_styled(line_one, inner_width), inner_width)
-    line_two = pad_to_width(truncate_styled(line_two, inner_width), inner_width)
-
-    return "\n".join(
-        [
-            b_col + TOP_LEFT + horizontal_line(inner_width) + TOP_RIGHT + b_rst,
-            b_col + VERTICAL + b_rst + line_one + b_col + VERTICAL + b_rst,
-            b_col + VERTICAL + b_rst + line_two + b_col + VERTICAL + b_rst,
-            b_col + BOTTOM_LEFT + horizontal_line(inner_width) + BOTTOM_RIGHT + b_rst,
-        ]
-    )
-
 
 
 def draw_panel(
@@ -234,7 +229,7 @@ def draw_panel(
     styled: bool = False,
     border_color: str = "",
 ) -> List[str]:
-    """Render one rounded-border panel."""
+    """Render a rounded-border panel card."""
     width = max(8, width)
     inner_width = width - 2
     content_width = inner_width - 2
@@ -247,7 +242,6 @@ def draw_panel(
     ]
 
     title_text = truncate_styled(f" {title} ", content_width)
-
     lines.append(
         b_col + PANEL_VERTICAL + b_rst
         + " "
@@ -258,7 +252,6 @@ def draw_panel(
 
     for item in content:
         item = truncate_styled(str(item), content_width)
-
         lines.append(
             b_col + PANEL_VERTICAL + b_rst
             + " "
@@ -270,7 +263,6 @@ def draw_panel(
     lines.append(
         b_col + PANEL_BOTTOM_LEFT + PANEL_HORIZONTAL * (width - 2) + PANEL_BOTTOM_RIGHT + b_rst
     )
-
     return lines
 
 
@@ -283,9 +275,7 @@ def draw_split_panels(
     gap: int = 2,
     styled: bool = False,
 ) -> str:
-    """
-    Render Mission Intel and Terminal as side-by-side panels.
-    """
+    """Render side-by-side rounded panels."""
     width = max(30, width)
     gap = max(1, gap)
 
@@ -293,14 +283,13 @@ def draw_split_panels(
     left_width = available // 2
     right_width = available - left_width
 
-    left_border = "\033[96m" if styled else ""
+    left_border = "\033[93m" if styled else ""
     right_border = "\033[92m" if styled else ""
 
     left_items = list(left_content)
     right_items = list(right_content)
     target_height = max(len(left_items), len(right_items))
 
-    # Pad inner content so both panels have matching side borders and bottom borders
     left_items += [""] * (target_height - len(left_items))
     right_items += [""] * (target_height - len(right_items))
 
@@ -308,7 +297,6 @@ def draw_split_panels(
     right = draw_panel(right_title, right_items, right_width, styled=styled, border_color=right_border)
 
     height = max(len(left), len(right))
-
     left += [" " * left_width] * (height - len(left))
     right += [" " * right_width] * (height - len(right))
 
