@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import re
+import unicodedata
 from typing import List, Optional, Tuple, Union
 
 ANSI_ESCAPE_RE = re.compile(r"\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
@@ -21,7 +22,19 @@ def strip_ansi(text: str) -> str:
 
 def visual_len(text: str) -> int:
     """Return visible terminal display width of text, ignoring ANSI escape codes."""
-    return len(strip_ansi(text))
+    clean = strip_ansi(text)
+    w = 0
+    for char in clean:
+        eaw = unicodedata.east_asian_width(char)
+        if eaw in ('F', 'W'):
+            w += 2
+        else:
+            # Emoji fallback: many non-EAW chars are still wide emojis
+            if ord(char) >= 0x1F000:
+                w += 2
+            else:
+                w += 1
+    return w
 
 
 # =============================================================================

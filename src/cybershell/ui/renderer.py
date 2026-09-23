@@ -320,8 +320,8 @@ def draw_field_manual_card(
 
     lines = [top]
     if page == 1:
-        h1_p = r"  (\__/)    📖 FIELD MANUAL & RULES  [Page 1/2]"
-        h1_s = r"  \033[92m(\__/)\033[0m    \033[1;93m📖 FIELD MANUAL & RULES\033[0m  \033[2m[Page 1/2]\033[0m"
+        h1_p = "  (\\_/)    📖 FIELD MANUAL & RULES  [Page 1/2]"
+        h1_s = "  \033[92m(\\_/)\033[0m    \033[1;93m📖 FIELD MANUAL & RULES\033[0m  \033[2m[Page 1/2]\033[0m"
         h2_p = "  (・ω・)   Welcome to Byte's Linux Adventure!"
         h2_s = "  \033[92m(・ω・)\033[0m   \033[1;97mWelcome to Byte's Linux Adventure!\033[0m"
         h3_p = "  / >🌱     Learn real skills safely with zero penalties!"
@@ -350,8 +350,8 @@ def draw_field_manual_card(
         tip_s = "  \033[2;93m💡 Tip: Zero penalties. Relax, experiment, and have fun!\033[0m"
         lines.append(row(tip_s, tip_p))
     else:
-        h1_p = r"  (\__/)    📖 FIELD MANUAL & RULES  [Page 2/2]"
-        h1_s = r"  \033[92m(\\__/)\033[0m    \033[1;93m📖 FIELD MANUAL & RULES\033[0m  \033[2m[Page 2/2]\033[0m"
+        h1_p = "  (\\_/)    📖 FIELD MANUAL & RULES  [Page 2/2]"
+        h1_s = "  \033[92m(\\_/)\033[0m    \033[1;93m📖 FIELD MANUAL & RULES\033[0m  \033[2m[Page 2/2]\033[0m"
         h2_p = "  (・ω・)   Handy Linux Command Reference"
         h2_s = "  \033[92m(・ω・)\033[0m   \033[1;97mHandy Linux Command Reference\033[0m"
         h3_p = "  / >🌱     Essential tools for exploring the terminal:"
@@ -527,6 +527,84 @@ def draw_split_panels(
         left_line + (" " * gap) + right_line
         for left_line, right_line in zip(left, right)
     )
+
+
+def draw_fixed_panel(title: str, content: Iterable[str], width: int, height: int, styled: bool = False, border_color: str = "") -> List[str]:
+    """Render a rounded panel that is exactly width x height."""
+    width = max(8, width)
+    height = max(3, height)
+    inner_width = width - 2
+    content_width = inner_width - 2
+    
+    b_col = border_color if styled else ""
+    b_rst = "\033[0m" if styled and b_col else ""
+    
+    lines = [b_col + PANEL_TOP_LEFT + PANEL_HORIZONTAL * (width - 2) + PANEL_TOP_RIGHT + b_rst]
+    
+    title_text = truncate_styled(f" {title} ", content_width)
+    lines.append(
+        b_col + PANEL_VERTICAL + b_rst
+        + " "
+        + pad_to_width(title_text, content_width)
+        + " "
+        + b_col + PANEL_VERTICAL + b_rst
+    )
+    
+    content_lines = list(content)
+    max_content = height - 3
+    for i in range(max_content):
+        item = str(content_lines[i]) if i < len(content_lines) else ""
+        item = truncate_styled(item, content_width)
+        lines.append(
+            b_col + PANEL_VERTICAL + b_rst
+            + " "
+            + pad_to_width(item, content_width)
+            + " "
+            + b_col + PANEL_VERTICAL + b_rst
+        )
+        
+    lines.append(b_col + PANEL_BOTTOM_LEFT + PANEL_HORIZONTAL * (width - 2) + PANEL_BOTTOM_RIGHT + b_rst)
+    return lines
+
+
+def draw_opencode_layout(
+    task_title: str, task_content: List[str],
+    term_title: str, term_content: List[str],
+    docs_title: str, docs_content: List[str],
+    mascot_content: List[str],
+    width: int = 80, height: int = 24,
+    gap: int = 1,
+    styled: bool = True
+) -> str:
+    """Render a 4-pane Opencode style layout exactly matching terminal height."""
+    left_width = int(width * 0.70)
+    right_width = width - left_width - gap
+    
+    needed_task_height = len(task_content) + 3 # +3 for borders and title padding
+    max_task_height = max(5, height - 8) # Leave at least 8 lines for the terminal
+    task_height = max(5, min(needed_task_height, max_task_height))
+    term_height = height - task_height
+    
+    mascot_height = min(max(8, len(mascot_content) + 2), int(height * 0.40))
+    docs_height = height - mascot_height
+    
+    term_max_content = term_height - 3
+    sliced_term = term_content[-term_max_content:] if len(term_content) > term_max_content else term_content
+    
+    # We use hardcoded ANSI colors for borders here for simplicity, but could use fg_hex
+    task_panel = draw_fixed_panel(task_title, task_content, left_width, task_height, styled=styled, border_color="\033[38;2;187;154;247m") # HEX_PURPLE
+    term_panel = draw_fixed_panel(term_title, sliced_term, left_width, term_height, styled=styled, border_color="\033[38;2;122;162;247m") # HEX_BLUE
+    docs_panel = draw_fixed_panel(docs_title, docs_content, right_width, docs_height, styled=styled, border_color="\033[38;2;125;207;200m") # HEX_CYAN
+    mascot_panel = draw_fixed_panel("BYTE", mascot_content, right_width, mascot_height, styled=styled, border_color="\033[38;2;224;175;104m") # HEX_YELLOW
+    
+    left_col = task_panel + term_panel
+    right_col = docs_panel + mascot_panel
+    
+    return "\n".join(
+        l + (" " * gap) + r
+        for l, r in zip(left_col, right_col)
+    )
+
 
 
 # =============================================================================
